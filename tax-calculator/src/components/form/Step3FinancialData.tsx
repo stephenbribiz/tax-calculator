@@ -4,6 +4,7 @@ import type { CompanyType } from '@/types'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import { Toggle } from '@/components/ui/Toggle'
 import { Button } from '@/components/ui/Button'
+import { PLUpload } from '@/components/form/PLUpload'
 import { getTaxDataByYear } from '@/tax-engine/constants'
 
 interface Step3Props {
@@ -27,9 +28,15 @@ export function Step3FinancialData({
   onSubmit,
   onBack,
 }: Step3Props) {
-  const { control, handleSubmit } = useForm<Step3Data>({ defaultValues })
+  const { control, handleSubmit, setValue } = useForm<Step3Data>({ defaultValues })
   const isScorp = companyType === 'S-Corp'
   const showFEField = stateCode === 'TN' && companyType !== 'Sole-Prop'
+
+  function handlePLApply(values: Record<string, number>) {
+    for (const [key, val] of Object.entries(values)) {
+      setValue(key as keyof Step3Data, val, { shouldDirty: true, shouldValidate: true })
+    }
+  }
 
   // Get standard deduction for the selected year/filing status
   const taxData = getTaxDataByYear(taxYear)
@@ -43,6 +50,9 @@ export function Step3FinancialData({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+
+      {/* P&L Upload */}
+      <PLUpload companyType={companyType} onApply={handlePLApply} />
 
       {/* Business Income */}
       <div>
