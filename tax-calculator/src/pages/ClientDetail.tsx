@@ -32,7 +32,7 @@ export default function ClientDetail() {
           <h1 className="text-2xl font-bold text-slate-900">{client.owner_name}</h1>
           <p className="text-sm text-slate-500">{client.company_name} · {client.company_type} · {client.state}</p>
         </div>
-        <Link to="/reports/new">
+        <Link to={`/reports/new?client=${client.id}`}>
           <Button size="sm">+ New Estimate</Button>
         </Link>
       </div>

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import type { TaxInput, TaxOutput, Step1Data, Step2Data, Step3Data } from '@/types'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import type { TaxInput, TaxOutput, Step1Data, Step2Data, Step3Data, Quarter, CompanyType, FilingStatus, StateCode } from '@/types'
 import { calculateTax } from '@/tax-engine'
 import { useFormState } from '@/hooks/useFormState'
 import { useAuth } from '@/hooks/useAuth'
@@ -40,14 +40,77 @@ function toTaxInput(s1: Step1Data, s2: Step2Data, s3: Step3Data): TaxInput {
   }
 }
 
+const QUARTERS: Quarter[] = ['Q1', 'Q2', 'Q3', 'Q4']
+
 export default function NewReport() {
   const { state, dispatch } = useFormState()
   const { user } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [output, setOutput] = useState<TaxOutput | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [clientId, setClientId] = useState<string | null>(null)
+  const clientLoaded = useRef(false)
+
+  // Load client data when ?client=<id> is present
+  useEffect(() => {
+    const id = searchParams.get('client')
+    if (!id || clientLoaded.current) return
+    clientLoaded.current = true
+    setClientId(id)
+
+    async function loadClient() {
+      // Fetch client profile
+      const { data: client } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('id', id)
+        .single()
+
+      if (!client) return
+
+      const taxYear = new Date().getFullYear()
+
+      // Fetch existing reports for this client/year to find next quarter
+      const { data: existingReports } = await supabase
+        .from('reports')
+        .select('quarter')
+        .eq('client_id', id)
+        .eq('tax_year', taxYear)
+
+      const doneQuarters = (existingReports ?? []).map(r => r.quarter)
+      const nextQuarter = QUARTERS.find(q => !doneQuarters.includes(q)) ?? 'Q1'
+
+      // Pre-populate Step 1 and Step 2 from saved client data
+      dispatch({
+        type: 'SET_STEP1',
+        payload: {
+          companyName:  client.company_name,
+          companyType:  client.company_type as CompanyType,
+          ownerName:    client.owner_name,
+          taxYear,
+          dateCompleted: new Date().toISOString().split('T')[0],
+        },
+      })
+      dispatch({
+        type: 'SET_STEP2',
+        payload: {
+          quarter:              nextQuarter as Quarter,
+          filingStatus:         (client.filing_status ?? 'Single') as FilingStatus,
+          ownershipPct:         client.ownership_pct ?? 100,
+          numDependentChildren: client.num_dependents ?? 0,
+          state:                client.state as StateCode,
+        },
+      })
+
+      // Skip straight to the financial data step
+      dispatch({ type: 'GO_TO_STEP', payload: 3 })
+    }
+
+    loadClient()
+  }, [searchParams, dispatch])
 
   // Live calculation — debounced 300ms
   const taxInput = useMemo(() => toTaxInput(state.step1, state.step2, state.step3), [state.step1, state.step2, state.step3])
@@ -116,7 +179,7 @@ export default function NewReport() {
     })
 
     if (reportError) { setSaveError(reportError.message); setSaving(false); return }
-    navigate('/')
+    navigate(clientData.id ? `/clients/${clientData.id}` : '/')
   }
 
   return (

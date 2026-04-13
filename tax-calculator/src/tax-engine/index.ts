@@ -85,7 +85,7 @@ export function calculateTax(input: TaxInput): TaxOutput {
   // 12. Federal income tax calculation
   const federal = calculateFederal({
     taxableIncome: taxableIncomeWithQBI,
-    totalAGI: actualAGI,
+    totalAGI,
     businessTaxableIncome: businessTaxableWithQBI,
     filingStatus: input.filingStatus,
     companyType: input.companyType,
