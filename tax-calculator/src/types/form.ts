@@ -26,6 +26,7 @@ export interface Step3Data {
   otherIncome: number
   spousalIncome: number
   priorEstimatesPaid: number
+  priorFEPaid: number              // TN F&E estimates already paid
   deductionOverride: number | null
   annualizeIncome: boolean
 }

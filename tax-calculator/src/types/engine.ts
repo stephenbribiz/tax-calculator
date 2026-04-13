@@ -28,6 +28,7 @@ export interface TaxInput {
   otherIncome: number
   spousalIncome: number
   priorEstimatesPaid: number
+  priorFEPaid: number              // TN F&E estimates already paid this year
   deductionOverride: number | null  // null = use standard deduction
   annualizeIncome: boolean
 }

@@ -29,13 +29,6 @@ export default function Dashboard() {
     [reports, currentYear]
   )
 
-  const totalTaxOwed = useMemo(() => {
-    return currentYearReports.reduce((sum, r) => {
-      const output = r.output_snapshot as unknown as TaxOutput
-      return sum + (output?.totalTaxOwed ?? 0)
-    }, 0)
-  }, [currentYearReports])
-
   const currentQuarterCount = useMemo(
     () => currentYearReports.filter(r => r.quarter === currentQuarter).length,
     [currentYearReports, currentQuarter]
@@ -66,7 +59,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <Card>
           <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Clients</p>
           <p className="text-3xl font-bold text-slate-900">
@@ -77,12 +70,6 @@ export default function Dashboard() {
           <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Tax Plans</p>
           <p className="text-3xl font-bold text-slate-900">
             {reportsLoading ? '—' : reports.length}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Total Tax Owed ({currentYear})</p>
-          <p className="text-3xl font-bold text-slate-900">
-            {reportsLoading ? '—' : formatCurrency(totalTaxOwed)}
           </p>
         </Card>
         <Card>

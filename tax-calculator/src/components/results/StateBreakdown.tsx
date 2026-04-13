@@ -8,6 +8,9 @@ export function StateBreakdown({ input, output }: Props) {
   const { state } = output
   const hasStateTax = state.stateIncomeTax > 0
   const hasEntityTax = state.exciseTax > 0 || state.franchiseTax > 0
+  const annualFE = state.exciseTax + state.franchiseTax
+  const priorFEPaid = input.priorFEPaid ?? 0
+  const netFEOwed = Math.max(0, annualFE - priorFEPaid)
 
   return (
     <Card>
@@ -35,7 +38,9 @@ export function StateBreakdown({ input, output }: Props) {
         {hasEntityTax && (
           <>
             <div className="pt-2 pb-1">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Entity-Level Taxes</span>
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                {input.companyType} Franchise & Excise Tax
+              </span>
             </div>
             {state.exciseTax > 0 && (
               <div className="flex justify-between items-center py-1.5">
@@ -43,12 +48,30 @@ export function StateBreakdown({ input, output }: Props) {
                 <span className="text-sm font-medium text-slate-900">{formatCurrency(state.exciseTax)}</span>
               </div>
             )}
-            {state.franchiseTax > 0 && (
+            {state.exciseTax === 0 && (
               <div className="flex justify-between items-center py-1.5">
-                <span className="text-sm text-slate-600">Franchise Tax (minimum)</span>
-                <span className="text-sm font-medium text-slate-900">{formatCurrency(state.franchiseTax)}</span>
+                <span className="text-sm text-slate-600">Excise Tax</span>
+                <span className="text-sm font-medium text-slate-500">$0</span>
               </div>
             )}
+            <div className="flex justify-between items-center py-1.5">
+              <span className="text-sm text-slate-600">Franchise Tax (minimum)</span>
+              <span className="text-sm font-medium text-slate-900">{formatCurrency(state.franchiseTax)}</span>
+            </div>
+            <div className="flex justify-between items-center py-1.5">
+              <span className="text-sm text-slate-600">Annual F&E Total</span>
+              <span className="text-sm font-semibold text-slate-900">{formatCurrency(annualFE)}</span>
+            </div>
+            {priorFEPaid > 0 && (
+              <div className="flex justify-between items-center py-1.5">
+                <span className="text-sm text-slate-600">Prior F&E Payments</span>
+                <span className="text-sm font-medium text-slate-900">− {formatCurrency(priorFEPaid)}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center py-1.5">
+              <span className="text-sm font-medium text-slate-700">F&E Owed</span>
+              <span className="text-sm font-semibold text-slate-900">{formatCurrency(netFEOwed)}</span>
+            </div>
           </>
         )}
 

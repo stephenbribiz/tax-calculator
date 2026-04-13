@@ -199,6 +199,7 @@ export default function QuickCalculator() {
             filingStatus={profile.filingStatus}
             taxYear={profile.taxYear}
             ownershipPct={profile.ownershipPct}
+            stateCode={profile.state}
             onSubmit={handleFinancials}
             onBack={() => setStep('profile')}
           />

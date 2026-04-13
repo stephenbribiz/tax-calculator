@@ -168,9 +168,11 @@ export function calculateTax(input: TaxInput): TaxOutput {
       shareholderSalary: input.shareholderSalary,
     })
 
-    // Add entity-level taxes (excise + franchise) — not prorated, these are annual
-    const entityLevelTax = state.exciseTax + state.franchiseTax
-    totalStateOwed += entityLevelTax
+    // Add entity-level taxes (excise + franchise) — full annual amount minus prior F&E payments
+    const annualFE = state.exciseTax + state.franchiseTax
+    const priorFEPaid = input.priorFEPaid ?? 0
+    const netFEOwed = Math.max(0, annualFE - priorFEPaid)
+    totalStateOwed += netFEOwed
 
     const totalTaxOwed = totalFederalOwed + totalStateOwed
     const netAmountDue = Math.max(0, totalTaxOwed - input.priorEstimatesPaid)
@@ -247,12 +249,15 @@ export function calculateTax(input: TaxInput): TaxOutput {
     year: input.taxYear,
     companyType: input.companyType,
     businessNetIncome: input.businessNetIncome,
+    shareholderSalary: input.shareholderSalary,
   })
   totalStateOwed = state.stateIncomeTax // no proration
 
-  // Add entity-level taxes (excise + franchise)
-  const entityLevelTax = state.exciseTax + state.franchiseTax
-  totalStateOwed += entityLevelTax
+  // Add entity-level taxes (excise + franchise) — full annual amount minus prior F&E payments
+  const annualFE = state.exciseTax + state.franchiseTax
+  const priorFEPaid = input.priorFEPaid ?? 0
+  const netFEOwed = Math.max(0, annualFE - priorFEPaid)
+  totalStateOwed += netFEOwed
 
   const totalTaxOwed = totalFederalOwed + totalStateOwed
   const netAmountDue = Math.max(0, totalTaxOwed - input.priorEstimatesPaid)

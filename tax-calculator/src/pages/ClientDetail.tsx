@@ -4,12 +4,62 @@ import { useReports } from '@/hooks/useReports'
 import { useClients } from '@/hooks/useClients'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/Button'
+import { Card } from '@/components/ui/Card'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { TaxOutput, TaxInput } from '@/types'
 import type { DbReport } from '@/lib/supabase'
+
+function ClientTaxSummary({ reports: allReports }: { reports: DbReport[] }) {
+  const currentYear = new Date().getFullYear()
+  const summary = useMemo(() => {
+    const yearReports = allReports.filter(r => r.tax_year === currentYear)
+    if (yearReports.length === 0) return null
+
+    // Get the latest report (most recent quarter) for this year
+    const sorted = [...yearReports].sort((a, b) => {
+      const qOrder: Record<string, number> = { Q1: 1, Q2: 2, Q3: 3, Q4: 4 }
+      return (qOrder[b.quarter] ?? 0) - (qOrder[a.quarter] ?? 0)
+    })
+    const latest = sorted[0]
+    const output = latest.output_snapshot as unknown as TaxOutput
+
+    return {
+      year: currentYear,
+      latestQuarter: latest.quarter,
+      totalTaxOwed: output.totalTaxOwed,
+      netAmountDue: output.netAmountDue,
+      priorPayments: output.priorEstimatesPaid,
+      planCount: yearReports.length,
+    }
+  }, [allReports, currentYear])
+
+  if (!summary) return null
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+      <Card>
+        <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Total Tax ({summary.year})</p>
+        <p className="text-xl font-bold text-slate-900">{formatCurrency(summary.totalTaxOwed)}</p>
+        <p className="text-xs text-slate-400 mt-0.5">As of {summary.latestQuarter}</p>
+      </Card>
+      <Card>
+        <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Net Due</p>
+        <p className="text-xl font-bold text-slate-900">{formatCurrency(summary.netAmountDue)}</p>
+      </Card>
+      <Card>
+        <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Prior Payments</p>
+        <p className="text-xl font-bold text-slate-900">{formatCurrency(summary.priorPayments)}</p>
+      </Card>
+      <Card>
+        <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Plans ({summary.year})</p>
+        <p className="text-xl font-bold text-slate-900">{summary.planCount}</p>
+      </Card>
+    </div>
+  )
+}
 
 const QUARTERS = ['Q1', 'Q2', 'Q3', 'Q4'] as const
 
@@ -234,6 +284,10 @@ export default function ClientDetail() {
           <Button size="sm">+ New Tax Plan</Button>
         </Link>
       </div>
+
+      {!loading && reports.length > 0 && (
+        <ClientTaxSummary reports={reports} />
+      )}
 
       <div className="mb-6">
         <label className="block text-xs font-semibold text-slate-500 mb-1">Notes</label>

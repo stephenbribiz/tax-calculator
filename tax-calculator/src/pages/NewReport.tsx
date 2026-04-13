@@ -39,6 +39,7 @@ function toTaxInput(s1: Step1Data, s2: Step2Data, s3: Step3Data): TaxInput {
     otherIncome:          s3.otherIncome,
     spousalIncome:        s3.spousalIncome,
     priorEstimatesPaid:   s3.priorEstimatesPaid,
+    priorFEPaid:          s3.priorFEPaid,
     deductionOverride:    s3.deductionOverride,
     annualizeIncome:      s3.annualizeIncome,
   }
@@ -71,6 +72,7 @@ function fromTaxInput(input: TaxInput): { step1: Step1Data; step2: Step2Data; st
       otherIncome:        input.otherIncome,
       spousalIncome:      input.spousalIncome,
       priorEstimatesPaid: input.priorEstimatesPaid,
+      priorFEPaid:        input.priorFEPaid ?? 0,
       deductionOverride:  input.deductionOverride,
       annualizeIncome:    input.annualizeIncome,
     },
@@ -408,6 +410,7 @@ export default function NewReport() {
             filingStatus={state.step2.filingStatus}
             taxYear={state.step2.taxYear}
             ownershipPct={state.step2.ownershipPct}
+            stateCode={state.step2.state}
             onSubmit={handleStep3}
             onBack={() => dispatch({ type: 'GO_TO_STEP', payload: 2 })}
           />

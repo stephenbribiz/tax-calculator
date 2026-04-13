@@ -29,6 +29,7 @@ const defaultStep3: Step3Data = {
   otherIncome:        0,
   spousalIncome:      0,
   priorEstimatesPaid: 0,
+  priorFEPaid:        0,
   deductionOverride:  null,
   annualizeIncome:    false,
 }

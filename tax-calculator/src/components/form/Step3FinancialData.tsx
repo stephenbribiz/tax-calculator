@@ -12,6 +12,7 @@ interface Step3Props {
   filingStatus: string
   taxYear: number
   ownershipPct?: number
+  stateCode?: string
   onSubmit: (data: Step3Data) => void
   onBack: () => void
 }
@@ -22,11 +23,13 @@ export function Step3FinancialData({
   filingStatus,
   taxYear,
   ownershipPct = 100,
+  stateCode,
   onSubmit,
   onBack,
 }: Step3Props) {
   const { control, handleSubmit } = useForm<Step3Data>({ defaultValues })
   const isScorp = companyType === 'S-Corp'
+  const showFEField = stateCode === 'TN' && companyType !== 'Sole-Prop'
 
   // Get standard deduction for the selected year/filing status
   const taxData = getTaxDataByYear(taxYear)
@@ -160,6 +163,17 @@ export function Step3FinancialData({
               onChange={field.onChange}
             />
           )} />
+
+          {showFEField && (
+            <Controller name="priorFEPaid" control={control} render={({ field }) => (
+              <CurrencyInput
+                label="Prior F&E Tax Payments (YTD)"
+                hint="TN Franchise & Excise estimates already paid for this tax year"
+                value={field.value}
+                onChange={field.onChange}
+              />
+            )} />
+          )}
         </div>
       </div>
 

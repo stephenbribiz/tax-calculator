@@ -156,11 +156,16 @@ export function TaxReportDocument({ input, output }: Props) {
           ) : (
             <Row label={`No individual income tax in ${state.stateName}`} value="$0" muted />
           )}
-          {state.exciseTax > 0 && (
-            <Row label="Excise Tax (6.5% on net earnings)" value={formatCurrency(state.exciseTax)} />
-          )}
-          {state.franchiseTax > 0 && (
-            <Row label="Franchise Tax (minimum)" value={formatCurrency(state.franchiseTax)} />
+          {(state.exciseTax > 0 || state.franchiseTax > 0) && (
+            <>
+              <Row label={`${input.companyType} Excise Tax (6.5%)`} value={formatCurrency(state.exciseTax)} />
+              <Row label="Franchise Tax (minimum)" value={formatCurrency(state.franchiseTax)} />
+              <Row label="Annual F&E Total" value={formatCurrency(state.exciseTax + state.franchiseTax)} />
+              {(input.priorFEPaid ?? 0) > 0 && (
+                <Row label="Prior F&E Payments" value={`− ${formatCurrency(input.priorFEPaid ?? 0)}`} />
+              )}
+              <Row label="F&E Owed" value={formatCurrency(Math.max(0, state.exciseTax + state.franchiseTax - (input.priorFEPaid ?? 0)))} />
+            </>
           )}
           <View style={s.subtotalRow}>
             <Text style={s.subtotalLabel}>State Owed for {input.quarter}</Text>

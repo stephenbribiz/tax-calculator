@@ -1,10 +1,16 @@
 import type { StateResult, FilingStatus, CompanyType } from '@/types'
 
 // Tennessee has no individual income tax (Hall Tax fully repealed Jan 1, 2021).
-// Business-level taxes apply to S-Corps, LLCs, and Partnerships:
-//   - Excise Tax: 6.5% on net earnings AFTER shareholder wages
-//   - Franchise Tax: 0.25% on net worth or book value of real/tangible property in TN (min $100)
-// These are entity-level obligations but are real costs the business owner pays.
+//
+// Business-level F&E taxes by entity type:
+//   S-Corp:           Subject to Excise (6.5% net earnings after wages) + Franchise (0.25% net worth, min $100)
+//   LLC:              Subject to Excise + Franchise
+//   Partnership:      Subject to Excise + Franchise
+//   Single-Member LLC: Subject to Excise + Franchise (treated as disregarded entity but still owes F&E)
+//   Sole Prop:        NOT subject to F&E (no separate entity filing)
+//
+// Excise Tax base = net earnings AFTER deductible shareholder wages (S-Corp).
+// Franchise Tax base = greater of net worth or book value of real/tangible property in TN (min $100/year).
 
 export function calculateTN(
   _allocatedBusinessIncome: number,
@@ -18,31 +24,41 @@ export function calculateTN(
   const fullBusinessIncome = businessNetIncome ?? 0
   const salary = shareholderSalary ?? 0
 
-  // Calculate excise tax for entity types subject to it
-  const entitySubjectToExcise = companyType === 'S-Corp' || companyType === 'LLC'
+  // Sole Props have no separate entity — not subject to TN F&E
+  const entitySubjectToFE = companyType === 'S-Corp' || companyType === 'LLC'
     || companyType === 'Partnership' || companyType === 'Single-Member-LLC'
 
-  // Excise tax is on net earnings AFTER shareholder wages (wages are a deductible expense)
+  // Excise tax: 6.5% on net earnings AFTER deductible shareholder wages
   const netEarningsAfterWages = Math.max(0, fullBusinessIncome - salary)
-  const exciseTax = entitySubjectToExcise && netEarningsAfterWages > 0
+  const exciseTax = entitySubjectToFE && netEarningsAfterWages > 0
     ? netEarningsAfterWages * 0.065
     : 0
 
-  // Franchise tax requires net worth (we don't have it) — show minimum as estimate
-  const franchiseTax = entitySubjectToExcise ? 100 : 0
+  // Franchise tax: 0.25% of net worth (minimum $100/year)
+  // We don't have net worth data, so use the minimum as an estimate
+  const franchiseTax = entitySubjectToFE ? 100 : 0
 
   const notes: string[] = [
     'Tennessee has no individual state income tax.',
   ]
 
-  if (entitySubjectToExcise) {
-    if (salary > 0) {
-      notes.push(`Excise Tax: 6.5% on net earnings after shareholder wages ($${netEarningsAfterWages.toLocaleString()}).`)
-    } else {
-      notes.push(`Excise Tax: 6.5% on net earnings.`)
+  if (entitySubjectToFE) {
+    const entityLabel = companyType ?? 'Entity'
+    notes.push(`${entityLabel} is subject to TN Franchise & Excise Tax.`)
+    if (exciseTax > 0) {
+      if (salary > 0) {
+        notes.push(`Excise Tax: 6.5% × $${netEarningsAfterWages.toLocaleString()} (net earnings of $${fullBusinessIncome.toLocaleString()} minus wages of $${salary.toLocaleString()}).`)
+      } else {
+        notes.push(`Excise Tax: 6.5% × $${fullBusinessIncome.toLocaleString()} net earnings.`)
+      }
+    } else if (fullBusinessIncome <= 0) {
+      notes.push('No Excise Tax owed — business has no positive net earnings.')
+    } else if (salary >= fullBusinessIncome) {
+      notes.push('No Excise Tax owed — shareholder wages offset net earnings.')
     }
     notes.push(`Franchise Tax: 0.25% on net worth (minimum $100/year). Using minimum — actual depends on entity net worth.`)
-    notes.push('These entity-level taxes are filed with the business return.')
+  } else if (companyType === 'Sole-Prop') {
+    notes.push('Sole proprietorships are not subject to TN Franchise & Excise Tax.')
   }
 
   return {
