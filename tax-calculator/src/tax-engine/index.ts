@@ -45,12 +45,24 @@ export function calculateTax(input: TaxInput): TaxOutput {
     ? input.deductionOverride
     : standardDeduction
 
-  // 8. Total AGI (all income sources — used for bracket and credit phase-outs)
+  // 8. Total AGI (all income sources — used for bracket placement)
   const totalAGI = allocatedBusinessIncome
     + input.otherIncome
     + input.spousalIncome
     + mealAddBack
     - seTaxResult.deductibleHalf
+
+  // 8a. Actual (non-annualized) AGI — used for credit phase-outs only.
+  //     Child tax credit phase-out is based on what the client has actually earned,
+  //     not a projected annual figure, so annualization should not affect it.
+  const actualAllocatedIncome = input.businessNetIncome * (input.ownershipPct / 100)
+  const actualSENetIncome = Math.max(0, actualAllocatedIncome + mealAddBack)
+  const actualSETaxResult = calculateSETax(actualSENetIncome, input.taxYear, input.companyType)
+  const actualAGI = actualAllocatedIncome
+    + input.otherIncome
+    + input.spousalIncome
+    + mealAddBack
+    - actualSETaxResult.deductibleHalf
 
   // 9. Total taxable income (including spousal/other — for correct bracket assignment)
   const taxableIncome = Math.max(0, totalAGI - effectiveDeduction)
@@ -73,7 +85,7 @@ export function calculateTax(input: TaxInput): TaxOutput {
   // 12. Federal income tax calculation
   const federal = calculateFederal({
     taxableIncome: taxableIncomeWithQBI,
-    totalAGI,
+    totalAGI: actualAGI,
     businessTaxableIncome: businessTaxableWithQBI,
     filingStatus: input.filingStatus,
     companyType: input.companyType,
