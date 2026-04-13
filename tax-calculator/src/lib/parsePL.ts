@@ -50,7 +50,7 @@ async function extractTextFromPDF(file: File): Promise<string> {
         items
           .sort((a, b) => a.x - b.x)
           .map(i => i.text)
-          .join('  ')
+          .join('\t')
           .trim()
       )
       .filter(line => line.length > 0)
@@ -62,79 +62,85 @@ async function extractTextFromPDF(file: File): Promise<string> {
 }
 
 /**
- * Parse a dollar amount from text, handling parentheses for negatives
- * Matches: $1,234.56, (1,234.56), $1234, -$1,234.56, etc.
+ * Parse a dollar amount from text, handling parentheses for negatives.
+ * Matches: $1,234.56, $(1,234.56), (1,234.56), $1234, -$1,234.56, etc.
  */
 function parseDollarAmount(text: string): number | null {
-  // Clean the text
   const cleaned = text.trim()
 
-  // Match amounts with optional $ and commas: $1,234.56 or (1,234.56) or -1234
-  const match = cleaned.match(/\(?\$?\s*-?\s*([\d,]+(?:\.\d{1,2})?)\)?/)
+  // Match amounts: $1,234.56 or $(1,234.56) or (1,234.56) or -1,234.56
+  const match = cleaned.match(/\$?\(?\s*-?\s*([\d,]+(?:\.\d{1,2})?)\s*\)?/)
   if (!match) return null
 
   const numStr = match[1].replace(/,/g, '')
   const value = parseFloat(numStr)
   if (isNaN(value)) return null
 
-  // Negative if wrapped in parens
-  const isNegative = cleaned.includes('(') && cleaned.includes(')')
+  // Negative if wrapped in parens: ($541.70) or $(541.70)
+  const isNegative = /\(.*\d.*\)/.test(cleaned) || cleaned.includes('-')
   return isNegative ? -value : value
 }
 
 /**
- * Find a dollar amount on the same line as a label, or on the next line
+ * Extract the YTD (last/rightmost) dollar amount from a line.
+ * AgilLink format: "Label \t monthly_amount \t ytd_amount"
+ * QuickBooks format: "Label    amount"
+ * preserveSign: if true, keeps negative values (for net income)
  */
-function findAmountForLabel(lines: string[], labelIndex: number): number | null {
-  const line = lines[labelIndex]
+function findYTDAmount(line: string, preserveSign = false): number | null {
+  // Find all dollar amounts on the line
+  const amounts = line.match(/\$?\(?\s*-?\s*[\d,]+(?:\.\d{1,2})?\s*\)?/g)
+  if (!amounts || amounts.length === 0) return null
 
-  // Look for dollar amounts on the same line (usually right-aligned)
-  // Split the line and look for the rightmost dollar amount
-  const amounts = line.match(/\(?\$?\s*-?\s*[\d,]+(?:\.\d{1,2})?\)?/g)
-  if (amounts && amounts.length > 0) {
-    // Take the last amount on the line (right-most column = this period's total)
-    const val = parseDollarAmount(amounts[amounts.length - 1])
-    if (val !== null) return Math.abs(val)
-  }
+  // Take the LAST amount (YTD / rightmost column)
+  const val = parseDollarAmount(amounts[amounts.length - 1])
+  if (val === null) return null
+
+  return preserveSign ? val : Math.abs(val)
+}
+
+/**
+ * Find a dollar amount for a label, checking same line and next line.
+ */
+function findAmountForLabel(lines: string[], labelIndex: number, preserveSign = false): number | null {
+  const val = findYTDAmount(lines[labelIndex], preserveSign)
+  if (val !== null) return val
 
   // Check next line if current line has no amount
   if (labelIndex + 1 < lines.length) {
-    const nextLine = lines[labelIndex + 1]
-    const nextAmounts = nextLine.match(/\(?\$?\s*-?\s*[\d,]+(?:\.\d{1,2})?\)?/g)
-    if (nextAmounts && nextAmounts.length > 0) {
-      const val = parseDollarAmount(nextAmounts[nextAmounts.length - 1])
-      if (val !== null) return Math.abs(val)
-    }
+    return findYTDAmount(lines[labelIndex + 1], preserveSign)
   }
 
   return null
 }
 
 // Pattern groups for matching P&L line items
-// Each group has multiple patterns to handle different accounting software formats
+// Covers: QuickBooks, Xero, AgilLink, and common accounting formats
 const PATTERNS = {
   netIncome: [
+    /net\s+income\s*\/\s*\(?\s*loss\s*\)?/i,     // AgilLink: "Net Income / (Loss)"
     /net\s+(ordinary\s+)?income/i,
     /net\s+profit/i,
-    /net\s+income\s*\/?\s*loss/i,
+    /net\s+income\s*[/&]\s*loss/i,
     /net\s+income/i,
     /net\s+earnings/i,
+    /profit\s*\(loss\)/i,
     /bottom\s+line/i,
-    /profit\s+\(loss\)/i,
   ],
   totalRevenue: [
-    /total\s+(income|revenue|sales)/i,
+    /^total\s+income\b/i,                          // AgilLink: "Total Income"
+    /total\s+(revenue|sales)/i,
+    /total\s+of\s+income/i,                         // AgilLink: "Total of Income From Operations"
     /gross\s+(income|revenue|receipts)/i,
-    /total\s+gross\s+income/i,
   ],
   totalExpenses: [
-    /total\s+expenses?/i,
+    /^total\s+expenses?\b/i,                        // AgilLink: "Total Expenses"
     /total\s+operating\s+expenses?/i,
   ],
   officerCompensation: [
-    /officer\s*('s?)?\s+comp/i,
-    /shareholder\s+salary/i,
+    /shareholder\s+salar/i,                         // AgilLink: "Shareholder Salary" or "Shareholder Salaries"
     /shareholder\s+comp/i,
+    /officer\s*('s?)?\s+comp/i,
     /officer\s+salary/i,
     /owner\s*('s?)?\s+salary/i,
     /owner\s*('s?)?\s+comp/i,
@@ -145,29 +151,70 @@ const PATTERNS = {
     /wages\s*[-–—]\s*officer/i,
   ],
   mealExpense: [
+    /^food\s*[&,]\s*tips/i,                         // AgilLink: "Food & Tips"
     /meals?\s*(and|&|\/)\s*(entertainment|ent)/i,
     /meals?\s+expense/i,
     /business\s+meals?/i,
     /food\s*(and|&|\/)\s*bev/i,
-    /dining/i,
-    /restaurant/i,
+    /^dining\b/i,
   ],
   shareholderDraw: [
     /shareholder\s+draw/i,
     /shareholder\s+dist/i,
     /owner\s*('s?)?\s+draw/i,
     /owner\s*('s?)?\s+dist/i,
-    /distributions?\s+to\s+(owner|shareholder)/i,
+    /distributions?\s+to\s+(owner|shareholder|member)/i,
     /member\s+draw/i,
     /member\s+dist/i,
   ],
 }
 
 /**
+ * Detect if text is from AgilLink (has the characteristic header format)
+ */
+function isAgilLinkFormat(text: string): boolean {
+  return /For the Month\s*\n\s*Ended/i.test(text) ||
+    /Year to Date\s*\n\s*at/i.test(text) ||
+    /Monthly Report/i.test(text)
+}
+
+/**
+ * For AgilLink reports with multiple sections (main P&L + tour sub-reports),
+ * extract only the main P&L section (everything before the first sub-report).
+ * Sub-reports repeat the header pattern.
+ */
+function extractMainSection(text: string): string {
+  const pageBreak = '--- Page Break ---'
+  const pages = text.split(pageBreak)
+
+  // Find where the main P&L ends by looking for "Net Income / (Loss)" on a page
+  // The first occurrence of Net Income signals the end of the main P&L
+  let mainText = ''
+  let foundNetIncome = false
+
+  for (const page of pages) {
+    mainText += page + '\n'
+    if (/net\s+income\s*\/\s*\(?\s*loss\s*\)?/i.test(page)) {
+      foundNetIncome = true
+      break
+    }
+  }
+
+  // If we found net income, use just the main section
+  // Otherwise fall back to full text
+  return foundNetIncome ? mainText : text
+}
+
+/**
  * Parse P&L text and extract financial data
  */
 function parseFinancialData(text: string): Omit<PLExtractedData, 'rawText'> {
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
+  const isAgilLink = isAgilLinkFormat(text)
+
+  // For AgilLink multi-section reports, only parse the main P&L
+  const parseText = isAgilLink ? extractMainSection(text) : text
+
+  const lines = parseText.split('\n').map(l => l.trim()).filter(l => l.length > 0)
 
   const result: Omit<PLExtractedData, 'rawText'> = {
     totalRevenue: null,
@@ -178,21 +225,24 @@ function parseFinancialData(text: string): Omit<PLExtractedData, 'rawText'> {
     shareholderDraw: null,
   }
 
-  // For net income, we want the LAST match (most likely the final bottom line)
-  let lastNetIncomeIdx = -1
-
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
 
-    // Net income — track last occurrence
-    for (const pattern of PATTERNS.netIncome) {
-      if (pattern.test(line)) {
-        lastNetIncomeIdx = i
-        break
+    // Skip header lines, page footers, and date lines
+    if (/^(For the Month|Ended|Year to Date|at\s+\d|Monthly Report|For the month)/i.test(line)) continue
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(line)) continue
+
+    // Net income — take FIRST match in the main section (preserves negative sign)
+    if (result.netIncome === null) {
+      for (const pattern of PATTERNS.netIncome) {
+        if (pattern.test(line)) {
+          result.netIncome = findAmountForLabel(lines, i, true)
+          break
+        }
       }
     }
 
-    // Total revenue — take first match
+    // Total revenue — take first "Total Income" match
     if (result.totalRevenue === null) {
       for (const pattern of PATTERNS.totalRevenue) {
         if (pattern.test(line)) {
@@ -212,17 +262,21 @@ function parseFinancialData(text: string): Omit<PLExtractedData, 'rawText'> {
       }
     }
 
-    // Officer compensation — take first match
+    // Officer / Shareholder compensation
+    // For AgilLink with "Total:" prefix lines, prefer the Total line
     if (result.officerCompensation === null) {
       for (const pattern of PATTERNS.officerCompensation) {
         if (pattern.test(line)) {
-          result.officerCompensation = findAmountForLabel(lines, i)
+          // If this is a "Total:" line or has amounts, grab it
+          if (/^Total:/i.test(line) || findAmountForLabel(lines, i) !== null) {
+            result.officerCompensation = findAmountForLabel(lines, i)
+          }
           break
         }
       }
     }
 
-    // Meal expense — accumulate if multiple matches
+    // Meal expense — accumulate (AgilLink "Food & Tips" or standard patterns)
     for (const pattern of PATTERNS.mealExpense) {
       if (pattern.test(line)) {
         const val = findAmountForLabel(lines, i)
@@ -233,7 +287,7 @@ function parseFinancialData(text: string): Omit<PLExtractedData, 'rawText'> {
       }
     }
 
-    // Shareholder draw — take first match
+    // Shareholder draw / distributions — take first match
     if (result.shareholderDraw === null) {
       for (const pattern of PATTERNS.shareholderDraw) {
         if (pattern.test(line)) {
@@ -242,11 +296,6 @@ function parseFinancialData(text: string): Omit<PLExtractedData, 'rawText'> {
         }
       }
     }
-  }
-
-  // Extract net income from the last occurrence
-  if (lastNetIncomeIdx >= 0) {
-    result.netIncome = findAmountForLabel(lines, lastNetIncomeIdx)
   }
 
   return result
