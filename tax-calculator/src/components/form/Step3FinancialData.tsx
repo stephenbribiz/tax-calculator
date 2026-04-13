@@ -44,8 +44,8 @@ export function Step3FinancialData({
         <div className="space-y-4">
           <Controller name="businessNetIncome" control={control} render={({ field }) => (
             <CurrencyInput
-              label="Business Net Income"
-              hint="Net profit of the business (after business expenses, before owner distributions)"
+              label="Business Net Income (YTD)"
+              hint="Cumulative net profit through this quarter (after business expenses, before owner distributions)"
               value={field.value}
               onChange={field.onChange}
             />
@@ -55,16 +55,16 @@ export function Step3FinancialData({
             <>
               <Controller name="shareholderSalary" control={control} render={({ field }) => (
                 <CurrencyInput
-                  label="Current Shareholder Salary (W-2)"
-                  hint="Annual W-2 salary paid to the shareholder. FICA taxes already withheld will be accounted for."
+                  label="Shareholder Salary Paid (YTD)"
+                  hint="Cumulative W-2 salary paid to the shareholder through this quarter. FICA already withheld will be subtracted."
                   value={field.value}
                   onChange={field.onChange}
                 />
               )} />
               <Controller name="adjustedSalary" control={control} render={({ field }) => (
                 <CurrencyInput
-                  label="Adjusted Salary for Reasonable Comp"
-                  hint="Optional: enter a target salary to see additional FICA impact. Leave at 0 for no adjustment."
+                  label="Adjusted Salary for Reasonable Comp (YTD)"
+                  hint="Optional: enter a target cumulative salary to see additional FICA impact. Leave at 0 for no adjustment."
                   value={field.value}
                   onChange={field.onChange}
                 />
@@ -72,7 +72,7 @@ export function Step3FinancialData({
               <Controller name="federalWithholding" control={control} render={({ field }) => (
                 <CurrencyInput
                   label="Federal Income Tax Withheld (YTD)"
-                  hint="Federal income tax already withheld from shareholder payroll this year."
+                  hint="Cumulative federal income tax withheld from shareholder payroll through this quarter."
                   value={field.value}
                   onChange={field.onChange}
                 />
@@ -144,8 +144,8 @@ export function Step3FinancialData({
 
           <Controller name="priorEstimatesPaid" control={control} render={({ field }) => (
             <CurrencyInput
-              label="Prior Estimated Tax Payments This Year"
-              hint="Total of all estimated payments already made for this tax year"
+              label="Prior Estimated Tax Payments (YTD)"
+              hint="Total of all estimated payments already made for this tax year through prior quarters"
               value={field.value}
               onChange={field.onChange}
             />
