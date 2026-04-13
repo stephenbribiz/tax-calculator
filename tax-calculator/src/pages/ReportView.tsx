@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { getReport } from '@/hooks/useReports'
+import { supabase } from '@/lib/supabase'
 import type { TaxInput, TaxOutput } from '@/types'
 import { ResultsPanel } from '@/components/results/ResultsPanel'
 import { Button } from '@/components/ui/Button'
@@ -13,15 +13,23 @@ import { formatDate } from '@/lib/utils'
 export default function ReportView() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const [input, setInput]   = useState<TaxInput | null>(null)
-  const [output, setOutput] = useState<TaxOutput | null>(null)
+  const [input, setInput]       = useState<TaxInput | null>(null)
+  const [output, setOutput]     = useState<TaxOutput | null>(null)
   const [clientId, setClientId] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError]   = useState<string | null>(null)
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState<string | null>(null)
 
   useEffect(() => {
     if (!id) return
-    getReport(id).then(({ data, error }) => {
+
+    async function load() {
+      // Fetch report directly (avoid join issues with RLS)
+      const { data, error } = await supabase
+        .from('reports')
+        .select('*')
+        .eq('id', id)
+        .single()
+
       if (error) { setError(error.message); setLoading(false); return }
       if (data) {
         setInput(data.input_snapshot as unknown as TaxInput)
@@ -29,7 +37,9 @@ export default function ReportView() {
         setClientId(data.client_id)
       }
       setLoading(false)
-    })
+    }
+
+    load()
   }, [id])
 
   if (loading) {
@@ -53,17 +63,19 @@ export default function ReportView() {
     <div className="max-w-5xl mx-auto px-4 py-8">
       <div className="flex items-start justify-between mb-6">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Link to="/" className="text-sm text-slate-400 hover:text-slate-600">Dashboard</Link>
+          {/* Breadcrumb — always shows Dashboard > Client > Plan */}
+          <nav className="flex items-center gap-2 mb-1 text-sm">
+            <Link to="/" className="text-slate-400 hover:text-slate-600">Dashboard</Link>
             <span className="text-slate-300">/</span>
-            {clientId && (
-              <>
-                <Link to={`/clients/${clientId}`} className="text-sm text-slate-400 hover:text-slate-600">{input.ownerName}</Link>
-                <span className="text-slate-300">/</span>
-              </>
-            )}
-            <span className="text-sm text-slate-600">{input.quarter} {input.taxYear}</span>
-          </div>
+            <Link
+              to={clientId ? `/clients/${clientId}` : '/clients'}
+              className="text-slate-400 hover:text-slate-600"
+            >
+              {input.ownerName || 'Client'}
+            </Link>
+            <span className="text-slate-300">/</span>
+            <span className="text-slate-600">{input.quarter} {input.taxYear}</span>
+          </nav>
           <h1 className="text-2xl font-bold text-slate-900">
             {input.ownerName} — {input.quarter} {input.taxYear} Tax Plan
           </h1>
