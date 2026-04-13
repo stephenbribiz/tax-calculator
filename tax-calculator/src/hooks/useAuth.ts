@@ -6,6 +6,7 @@ interface AuthState {
   user: User | null
   session: Session | null
   loading: boolean
+  isAdmin: boolean
 }
 
 export function useAuth(): AuthState {
@@ -13,23 +14,35 @@ export function useAuth(): AuthState {
     user: null,
     session: null,
     loading: true,
+    isAdmin: false,
   })
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setState({ user: session?.user ?? null, session, loading: false })
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      const isAdmin = session?.user ? await fetchIsAdmin(session.user.id) : false
+      setState({ user: session?.user ?? null, session, loading: false, isAdmin })
     })
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setState({ user: session?.user ?? null, session, loading: false })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const isAdmin = session?.user ? await fetchIsAdmin(session.user.id) : false
+      setState({ user: session?.user ?? null, session, loading: false, isAdmin })
     })
 
     return () => subscription.unsubscribe()
   }, [])
 
   return state
+}
+
+async function fetchIsAdmin(userId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .single()
+  return data?.role === 'admin'
 }
 
 export async function signIn(email: string, password: string) {

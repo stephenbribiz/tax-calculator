@@ -26,6 +26,15 @@ export interface DbClient {
   notes: string | null
 }
 
+export interface DbProfile {
+  id: string
+  email: string
+  full_name: string
+  role: 'user' | 'admin'
+  created_at: string
+  updated_at: string
+}
+
 export interface DbReport {
   id: string
   created_at: string
