@@ -18,36 +18,67 @@ export function useAuth(): AuthState {
   })
 
   useEffect(() => {
-    // If session was marked temporary (no "remember me"), clear it on fresh page load
-    // sessionStorage flag survives tab refreshes but not browser close
-    const isTemp = localStorage.getItem('tax-calc-session-temp') === 'true'
-    const stillAlive = sessionStorage.getItem('tax-calc-session-alive')
-    if (isTemp && !stillAlive) {
-      // Browser was closed and reopened — sign out
-      supabase.auth.signOut().then(() => {
-        localStorage.removeItem('tax-calc-session-temp')
-        setState({ user: null, session: null, loading: false, isAdmin: false })
-      })
-      return
-    }
-    // Mark session as alive for this browser session
-    if (isTemp) {
-      sessionStorage.setItem('tax-calc-session-alive', 'true')
+    let cancelled = false
+
+    async function init() {
+      try {
+        // If session was marked temporary (no "remember me"), clear it on fresh page load
+        const isTemp = localStorage.getItem('tax-calc-session-temp') === 'true'
+        const stillAlive = sessionStorage.getItem('tax-calc-session-alive')
+        if (isTemp && !stillAlive) {
+          localStorage.removeItem('tax-calc-session-temp')
+          await supabase.auth.signOut().catch(() => {})
+          if (!cancelled) setState({ user: null, session: null, loading: false, isAdmin: false })
+          return
+        }
+        if (isTemp) {
+          sessionStorage.setItem('tax-calc-session-alive', 'true')
+        }
+
+        // Get initial session with a timeout to prevent infinite spinner
+        const sessionResult = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise<null>(resolve => setTimeout(() => resolve(null), 8000)),
+        ])
+
+        if (cancelled) return
+
+        if (!sessionResult || !('data' in sessionResult)) {
+          // Timed out — clear any stale auth state and show login
+          console.warn('Auth session check timed out — clearing auth state')
+          await supabase.auth.signOut().catch(() => {})
+          setState({ user: null, session: null, loading: false, isAdmin: false })
+          return
+        }
+
+        const session = sessionResult.data.session
+        const isAdmin = session?.user ? await fetchIsAdmin(session.user.id) : false
+        if (!cancelled) {
+          setState({ user: session?.user ?? null, session, loading: false, isAdmin })
+        }
+      } catch (err) {
+        console.warn('Auth initialization error:', err)
+        if (!cancelled) {
+          setState({ user: null, session: null, loading: false, isAdmin: false })
+        }
+      }
     }
 
-    // Get initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      const isAdmin = session?.user ? await fetchIsAdmin(session.user.id) : false
-      setState({ user: session?.user ?? null, session, loading: false, isAdmin })
-    })
+    init()
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (cancelled) return
       const isAdmin = session?.user ? await fetchIsAdmin(session.user.id) : false
-      setState({ user: session?.user ?? null, session, loading: false, isAdmin })
+      if (!cancelled) {
+        setState({ user: session?.user ?? null, session, loading: false, isAdmin })
+      }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      cancelled = true
+      subscription.unsubscribe()
+    }
   }, [])
 
   return state

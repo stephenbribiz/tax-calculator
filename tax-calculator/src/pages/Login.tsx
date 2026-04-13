@@ -28,9 +28,6 @@ export default function Login() {
       return
     }
 
-    // Remember me: persist session to localStorage (survives browser close)
-    // Not remember me: persist to sessionStorage (clears when browser closes)
-    await supabase.auth.setSession  // not needed — Supabase handles persistence
     const { error } = await signIn(email, password)
     if (error) {
       setError(error.message)
