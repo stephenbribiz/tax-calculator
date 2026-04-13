@@ -7,9 +7,25 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables. Check .env.local')
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    storageKey: 'tax-calc-auth',
+    // Session auto-refreshes; JWT expiry is controlled server-side in Supabase dashboard.
+    // "Remember me" is handled by clearing session on browser close when unchecked.
+  },
+})
 
 // ---- Database types ----
+
+export interface DbProfile {
+  id: string
+  email: string
+  full_name: string
+  role: 'user' | 'admin'
+  created_at: string
+  updated_at: string
+}
 
 export interface DbClient {
   id: string
@@ -24,15 +40,6 @@ export interface DbClient {
   ownership_pct: number
   num_dependents: number
   notes: string | null
-}
-
-export interface DbProfile {
-  id: string
-  email: string
-  full_name: string
-  role: 'user' | 'admin'
-  created_at: string
-  updated_at: string
 }
 
 export interface DbReport {
