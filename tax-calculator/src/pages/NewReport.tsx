@@ -51,7 +51,6 @@ export default function NewReport() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [output, setOutput] = useState<TaxOutput | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [clientId, setClientId] = useState<string | null>(null)
   const clientLoaded = useRef(false)
 
   // Load client data when ?client=<id> is present
@@ -59,7 +58,6 @@ export default function NewReport() {
     const id = searchParams.get('client')
     if (!id || clientLoaded.current) return
     clientLoaded.current = true
-    setClientId(id)
 
     async function loadClient() {
       // Fetch client profile

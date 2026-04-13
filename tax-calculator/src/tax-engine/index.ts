@@ -52,18 +52,6 @@ export function calculateTax(input: TaxInput): TaxOutput {
     + mealAddBack
     - seTaxResult.deductibleHalf
 
-  // 8a. Actual (non-annualized) AGI — used for credit phase-outs only.
-  //     Child tax credit phase-out is based on what the client has actually earned,
-  //     not a projected annual figure, so annualization should not affect it.
-  const actualAllocatedIncome = input.businessNetIncome * (input.ownershipPct / 100)
-  const actualSENetIncome = Math.max(0, actualAllocatedIncome + mealAddBack)
-  const actualSETaxResult = calculateSETax(actualSENetIncome, input.taxYear, input.companyType)
-  const actualAGI = actualAllocatedIncome
-    + input.otherIncome
-    + input.spousalIncome
-    + mealAddBack
-    - actualSETaxResult.deductibleHalf
-
   // 9. Total taxable income (including spousal/other — for correct bracket assignment)
   const taxableIncome = Math.max(0, totalAGI - effectiveDeduction)
 
