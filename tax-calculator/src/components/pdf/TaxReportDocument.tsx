@@ -49,8 +49,8 @@ export function TaxReportDocument({ input, output }: Props) {
             <Row label="Annualized Business Income" value={formatCurrency(output.annualizedBusinessIncome)} />
           )}
           <Row label={`Allocated to Owner (${input.ownershipPct}%)`} value={formatCurrency(output.allocatedBusinessIncome)} />
-          {output.mealDeduction > 0 && (
-            <Row label="Meal Deduction (50%)" value={`− ${formatCurrency(output.mealDeduction)}`} />
+          {output.mealAddBack > 0 && (
+            <Row label="Meal Add-Back (50% non-deductible)" value={`+ ${formatCurrency(output.mealAddBack)}`} />
           )}
           {output.seTaxDeduction > 0 && (
             <Row label="SE Tax Deduction" value={`− ${formatCurrency(output.seTaxDeduction)}`} />

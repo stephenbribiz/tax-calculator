@@ -26,11 +26,12 @@ export function calculateTax(input: TaxInput): TaxOutput {
   // 2. Apply ownership percentage
   const allocatedBusinessIncome = effectiveBusinessIncome * (input.ownershipPct / 100)
 
-  // 3. Meal deduction (50% deductible)
-  const mealDeduction = input.mealExpense * 0.5
+  // 3. Meal add-back: net income already has 100% of meals deducted; only 50% is deductible,
+  //    so add the non-deductible 50% back to income.
+  const mealAddBack = input.mealExpense * 0.5
 
-  // 4. Adjusted net income for SE tax purposes (meals reduce SE income)
-  const seNetIncome = Math.max(0, allocatedBusinessIncome - mealDeduction)
+  // 4. Adjusted net income for SE tax purposes
+  const seNetIncome = Math.max(0, allocatedBusinessIncome + mealAddBack)
 
   // 5. SE tax (non-S-Corp only) + above-the-line deduction (50%)
   const seTaxResult = calculateSETax(seNetIncome, input.taxYear, input.companyType)
@@ -48,7 +49,7 @@ export function calculateTax(input: TaxInput): TaxOutput {
   const totalAGI = allocatedBusinessIncome
     + input.otherIncome
     + input.spousalIncome
-    - mealDeduction
+    + mealAddBack
     - seTaxResult.deductibleHalf
 
   // 9. Total taxable income (including spousal/other — for correct bracket assignment)
@@ -57,7 +58,7 @@ export function calculateTax(input: TaxInput): TaxOutput {
   // 10. Business-only taxable income (for ratio calculation — drives quarterly estimate)
   const businessAdjustedIncome = Math.max(0,
     allocatedBusinessIncome
-    - mealDeduction
+    + mealAddBack
     - seTaxResult.deductibleHalf
   )
   const businessTaxableIncome = Math.max(0, businessAdjustedIncome - effectiveDeduction)
@@ -115,7 +116,7 @@ export function calculateTax(input: TaxInput): TaxOutput {
   return {
     annualizedBusinessIncome: effectiveBusinessIncome,
     allocatedBusinessIncome,
-    mealDeduction,
+    mealAddBack,
     seTaxDeduction: seTaxResult.deductibleHalf,
     qbiDeduction,
     standardDeduction,

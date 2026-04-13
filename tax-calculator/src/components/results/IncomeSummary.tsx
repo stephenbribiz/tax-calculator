@@ -30,8 +30,8 @@ export function IncomeSummary({ input, output }: Props) {
           label={`Allocated to Owner (${input.ownershipPct}%)`}
           value={formatCurrency(output.allocatedBusinessIncome)}
         />
-        {output.mealDeduction > 0 && (
-          <Row label="Meal Deduction (50%)" value={`− ${formatCurrency(output.mealDeduction)}`} />
+        {output.mealAddBack > 0 && (
+          <Row label="Meal Add-Back (50% non-deductible)" value={`+ ${formatCurrency(output.mealAddBack)}`} />
         )}
         {output.seTaxDeduction > 0 && (
           <Row label="SE Tax Deduction (50% of SE tax)" value={`− ${formatCurrency(output.seTaxDeduction)}`} />

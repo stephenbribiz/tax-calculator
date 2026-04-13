@@ -83,7 +83,7 @@ export interface TaxOutput {
   // Derived intermediate values
   annualizedBusinessIncome: number
   allocatedBusinessIncome: number
-  mealDeduction: number
+  mealAddBack: number
   seTaxDeduction: number
   qbiDeduction: number
   standardDeduction: number
