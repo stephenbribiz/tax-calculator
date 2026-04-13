@@ -11,6 +11,7 @@ interface Step3Props {
   companyType: CompanyType
   filingStatus: string
   taxYear: number
+  ownershipPct?: number
   onSubmit: (data: Step3Data) => void
   onBack: () => void
 }
@@ -20,6 +21,7 @@ export function Step3FinancialData({
   companyType,
   filingStatus,
   taxYear,
+  ownershipPct = 100,
   onSubmit,
   onBack,
 }: Step3Props) {
@@ -33,6 +35,9 @@ export function Step3FinancialData({
   const deductionOverride = useWatch({ control, name: 'deductionOverride' })
   const isItemizing = deductionOverride !== null && deductionOverride > 0
 
+  const businessNetIncome = useWatch({ control, name: 'businessNetIncome' })
+  const shareholderSalary = useWatch({ control, name: 'shareholderSalary' })
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
 
@@ -43,23 +48,36 @@ export function Step3FinancialData({
         </h4>
         <div className="space-y-4">
           <Controller name="businessNetIncome" control={control} render={({ field }) => (
-            <CurrencyInput
-              label="Business Net Income (YTD)"
-              hint="Cumulative net profit through this quarter (after business expenses, before owner distributions)"
-              value={field.value}
-              onChange={field.onChange}
-            />
+            <div>
+              <CurrencyInput
+                label="Business Net Income (YTD)"
+                hint="Cumulative net profit through this quarter (after business expenses, before owner distributions)"
+                value={field.value}
+                onChange={field.onChange}
+              />
+              {businessNetIncome < 0 && (
+                <p className="text-xs text-amber-600 mt-1">Net income is negative. This will reduce your tax estimate.</p>
+              )}
+              {businessNetIncome * (ownershipPct / 100) > 10_000_000 && (
+                <p className="text-xs text-amber-600 mt-1">Please verify this amount.</p>
+              )}
+            </div>
           )} />
 
           {isScorp && (
             <>
               <Controller name="shareholderSalary" control={control} render={({ field }) => (
-                <CurrencyInput
-                  label="Shareholder Salary Paid (YTD)"
-                  hint="Cumulative W-2 salary paid to the shareholder through this quarter. FICA already withheld will be subtracted."
-                  value={field.value}
-                  onChange={field.onChange}
-                />
+                <div>
+                  <CurrencyInput
+                    label="Shareholder Salary Paid (YTD)"
+                    hint="Cumulative W-2 salary paid to the shareholder through this quarter. FICA already withheld will be subtracted."
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                  {shareholderSalary > businessNetIncome && businessNetIncome > 0 && (
+                    <p className="text-xs text-amber-600 mt-1">Shareholder salary exceeds business net income.</p>
+                  )}
+                </div>
               )} />
 <Controller name="federalWithholding" control={control} render={({ field }) => (
                 <CurrencyInput

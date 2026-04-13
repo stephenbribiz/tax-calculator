@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { TaxInput, TaxOutput, Step1Data, Step2Data, Step3Data, Quarter, CompanyType, FilingStatus, StateCode } from '@/types'
 import { calculateTax } from '@/tax-engine'
 import { useFormState } from '@/hooks/useFormState'
+import { useUnsavedChangesWarning } from '@/hooks/useUnsavedChangesWarning'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
 import { FormStepper } from '@/components/form/FormStepper'
@@ -11,6 +12,7 @@ import { Step2TaxProfile } from '@/components/form/Step2TaxProfile'
 import { Step3FinancialData } from '@/components/form/Step3FinancialData'
 import { ResultsPanel } from '@/components/results/ResultsPanel'
 import { Button } from '@/components/ui/Button'
+import { useToast } from '@/components/ui/Toast'
 
 const PDFDownloadButton = lazy(() =>
   import('@/components/pdf/PDFDownloadButton').then(m => ({ default: m.PDFDownloadButton }))
@@ -78,9 +80,10 @@ function fromTaxInput(input: TaxInput): { step1: Step1Data; step2: Step2Data; st
 const QUARTERS: Quarter[] = ['Q1', 'Q2', 'Q3', 'Q4']
 
 export default function NewReport() {
-  const { state, dispatch } = useFormState()
+  const { state, dispatch, hasDraft, draft } = useFormState()
   const { user } = useAuth()
   const navigate = useNavigate()
+  const { toast } = useToast()
   const [searchParams] = useSearchParams()
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -88,11 +91,22 @@ export default function NewReport() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const clientLoaded = useRef(false)
   const reportLoaded = useRef(false)
+  const [draftDismissed, setDraftDismissed] = useState(false)
 
   // The ID of the report being edited (null = new report)
   const editReportId = searchParams.get('edit')
+  const duplicateReportId = searchParams.get('duplicate')
+  const clientParam = searchParams.get('client')
   const [editClientId, setEditClientId] = useState<string | null>(null)
   const isEditing = !!editReportId
+  const duplicateLoaded = useRef(false)
+
+  // Show draft banner only when no URL params override and draft exists
+  const showDraftBanner = hasDraft && !draftDismissed && !editReportId && !clientParam && !duplicateReportId
+
+  // Warn before leaving with unsaved changes (step 2+, or results not yet saved)
+  const isDirty = state.step === 2 || state.step === 3 || state.step === 'results'
+  useUnsavedChangesWarning(isDirty)
 
   // Load existing report for editing when ?edit=<id> is present
   useEffect(() => {
@@ -123,6 +137,37 @@ export default function NewReport() {
 
     loadReport()
   }, [editReportId, dispatch])
+
+  // Load report for duplication when ?duplicate=<id> is present
+  useEffect(() => {
+    if (!duplicateReportId || duplicateLoaded.current) return
+    duplicateLoaded.current = true
+
+    async function loadDuplicate() {
+      const { data } = await supabase
+        .from('reports')
+        .select('*')
+        .eq('id', duplicateReportId)
+        .single()
+
+      if (!data) return
+
+      const input = data.input_snapshot as unknown as TaxInput
+      const { step1, step2, step3 } = fromTaxInput(input)
+
+      // Update dateCompleted to today
+      step2.dateCompleted = new Date().toISOString().split('T')[0]
+
+      dispatch({ type: 'SET_STEP1', payload: step1 })
+      dispatch({ type: 'SET_STEP2', payload: step2 })
+      dispatch({ type: 'SET_STEP3', payload: step3 })
+
+      // Go to Step 3 so user can adjust numbers — no editReportId set, so save creates a new report
+      dispatch({ type: 'GO_TO_STEP', payload: 3 })
+    }
+
+    loadDuplicate()
+  }, [duplicateReportId, dispatch])
 
   // Load client data when ?client=<id> is present (new report for existing client)
   useEffect(() => {
@@ -238,7 +283,7 @@ export default function NewReport() {
         })
         .eq('id', editReportId)
 
-      if (reportError) { setSaveError(reportError.message); setSaving(false); return }
+      if (reportError) { setSaveError(reportError.message); toast(reportError.message, 'error'); setSaving(false); return }
 
       // Also update the client profile in case any info changed
       if (editClientId) {
@@ -256,6 +301,8 @@ export default function NewReport() {
           .eq('id', editClientId)
       }
 
+      dispatch({ type: 'CLEAR_DRAFT' })
+      toast('Tax plan updated')
       navigate(editClientId ? `/clients/${editClientId}` : `/reports/${editReportId}`)
     } else {
       // ── CREATE new report ──
@@ -275,7 +322,7 @@ export default function NewReport() {
         .select('id')
         .single()
 
-      if (clientError) { setSaveError(clientError.message); setSaving(false); return }
+      if (clientError) { setSaveError(clientError.message); toast(clientError.message, 'error'); setSaving(false); return }
 
       const { error: reportError } = await supabase.from('reports').insert({
         client_id:       clientData.id,
@@ -287,7 +334,9 @@ export default function NewReport() {
         output_snapshot: output as unknown as Record<string, unknown>,
       })
 
-      if (reportError) { setSaveError(reportError.message); setSaving(false); return }
+      if (reportError) { setSaveError(reportError.message); toast(reportError.message, 'error'); setSaving(false); return }
+      dispatch({ type: 'CLEAR_DRAFT' })
+      toast('Tax plan saved')
       navigate(clientData.id ? `/clients/${clientData.id}` : '/')
     }
   }
@@ -302,6 +351,32 @@ export default function NewReport() {
           {state.step1.companyName || 'New Client'} {state.step2.quarter && `· ${state.step2.quarter} ${state.step2.taxYear}`}
         </p>
       </div>
+
+      {showDraftBanner && (
+        <div className="mb-4 flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <span>You have a saved draft.</span>
+          <button
+            type="button"
+            className="font-medium underline hover:text-amber-900"
+            onClick={() => {
+              if (draft) dispatch({ type: 'LOAD_DRAFT', payload: draft })
+              setDraftDismissed(true)
+            }}
+          >
+            Resume
+          </button>
+          <button
+            type="button"
+            className="font-medium underline hover:text-amber-900"
+            onClick={() => {
+              dispatch({ type: 'CLEAR_DRAFT' })
+              setDraftDismissed(true)
+            }}
+          >
+            Discard
+          </button>
+        </div>
+      )}
 
       {state.step !== 'results' && (
         <div className="mb-8">
@@ -332,6 +407,7 @@ export default function NewReport() {
             companyType={state.step1.companyType}
             filingStatus={state.step2.filingStatus}
             taxYear={state.step2.taxYear}
+            ownershipPct={state.step2.ownershipPct}
             onSubmit={handleStep3}
             onBack={() => dispatch({ type: 'GO_TO_STEP', payload: 2 })}
           />

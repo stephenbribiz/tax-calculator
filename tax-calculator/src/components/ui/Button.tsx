@@ -4,6 +4,7 @@ type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
 type Size    = 'sm' | 'md' | 'lg'
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  ref?: React.Ref<HTMLButtonElement>
   variant?: Variant
   size?: Size
   loading?: boolean
@@ -23,6 +24,7 @@ const sizeClasses: Record<Size, string> = {
 }
 
 export function Button({
+  ref,
   variant = 'primary',
   size = 'md',
   loading = false,
@@ -33,6 +35,7 @@ export function Button({
 }: ButtonProps) {
   return (
     <button
+      ref={ref}
       disabled={disabled || loading}
       className={cn(
         'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors cursor-pointer disabled:cursor-not-allowed',

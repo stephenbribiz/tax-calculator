@@ -18,7 +18,7 @@ export function PDFDownloadButton({ input, output }: Props) {
       const blob = await pdf(<TaxReportDocument input={input} output={output} />).toBlob()
       const url  = URL.createObjectURL(blob)
       const a    = document.createElement('a')
-      const filename = `${input.ownerName.replace(/\s+/g, '_')}_${input.quarter}_${input.taxYear}_Tax_Estimate.pdf`
+      const filename = `TaxPlan_${input.ownerName.replace(/\s+/g, '_')}_${input.quarter}_${input.taxYear}.pdf`
       a.href     = url
       a.download = filename
       a.click()

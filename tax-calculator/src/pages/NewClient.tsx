@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
+import { useToast } from '@/components/ui/Toast'
 import { COMPANY_TYPE_OPTIONS } from '@/constants/companyTypes'
 import { STATE_OPTIONS } from '@/constants/states'
 import { FILING_STATUS_OPTIONS } from '@/constants/quarters'
@@ -19,11 +20,13 @@ interface ClientFormData {
   filingStatus: FilingStatus
   ownershipPct: number
   numDependents: number
+  notes: string
 }
 
 export default function NewClient() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const { toast } = useToast()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -36,6 +39,7 @@ export default function NewClient() {
       filingStatus: 'Single',
       ownershipPct: 100,
       numDependents: 0,
+      notes: '',
     },
   })
 
@@ -54,6 +58,7 @@ export default function NewClient() {
         filing_status:  data.filingStatus,
         ownership_pct:  data.ownershipPct,
         num_dependents: data.numDependents,
+        notes:          data.notes || null,
         created_by:     user.id,
       }, { onConflict: 'company_name,created_by' })
       .select('id')
@@ -65,6 +70,7 @@ export default function NewClient() {
       return
     }
 
+    toast('Client saved')
     navigate(`/clients/${client.id}`)
   }
 
@@ -133,6 +139,16 @@ export default function NewClient() {
               min="0"
               hint="Qualifying children under 17 for Child Tax Credit"
               {...register('numDependents', { valueAsNumber: true, min: 0 })}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
+            <textarea
+              rows={3}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              placeholder="Optional notes about this client..."
+              {...register('notes')}
             />
           </div>
 

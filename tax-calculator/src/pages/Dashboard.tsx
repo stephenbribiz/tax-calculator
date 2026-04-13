@@ -1,14 +1,51 @@
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useClients } from '@/hooks/useClients'
 import { useReports } from '@/hooks/useReports'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { TaxOutput } from '@/types'
+
+function getCurrentQuarterLabel(): string {
+  const month = new Date().getMonth() // 0-indexed
+  if (month < 3) return 'Q1'
+  if (month < 6) return 'Q2'
+  if (month < 9) return 'Q3'
+  return 'Q4'
+}
 
 export default function Dashboard() {
   const { clients, loading: clientsLoading } = useClients()
   const { reports, loading: reportsLoading } = useReports()
+  const [clientSearch, setClientSearch] = useState('')
+
+  const currentYear = new Date().getFullYear()
+  const currentQuarter = getCurrentQuarterLabel()
+
+  const currentYearReports = useMemo(
+    () => reports.filter(r => r.tax_year === currentYear),
+    [reports, currentYear]
+  )
+
+  const totalTaxOwed = useMemo(() => {
+    return currentYearReports.reduce((sum, r) => {
+      const output = r.output_snapshot as unknown as TaxOutput
+      return sum + (output?.totalTaxOwed ?? 0)
+    }, 0)
+  }, [currentYearReports])
+
+  const currentQuarterCount = useMemo(
+    () => currentYearReports.filter(r => r.quarter === currentQuarter).length,
+    [currentYearReports, currentQuarter]
+  )
+
+  const filteredClients = clients.filter(c => {
+    if (!clientSearch) return true
+    const q = clientSearch.toLowerCase()
+    return c.owner_name.toLowerCase().includes(q) || c.company_name.toLowerCase().includes(q)
+  })
 
   const recentReports = reports.slice(0, 10)
 
@@ -29,7 +66,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <Card>
           <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Clients</p>
           <p className="text-3xl font-bold text-slate-900">
@@ -43,9 +80,18 @@ export default function Dashboard() {
           </p>
         </Card>
         <Card>
-          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">This Year</p>
+          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Total Tax Owed ({currentYear})</p>
           <p className="text-3xl font-bold text-slate-900">
-            {reportsLoading ? '—' : reports.filter(r => r.tax_year === new Date().getFullYear()).length}
+            {reportsLoading ? '—' : formatCurrency(totalTaxOwed)}
+          </p>
+        </Card>
+        <Card>
+          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Current Quarter</p>
+          <p className="text-3xl font-bold text-slate-900">
+            {reportsLoading ? '—' : currentQuarter}
+          </p>
+          <p className="text-xs text-slate-500 mt-1">
+            {reportsLoading ? '' : `${currentQuarterCount} plan${currentQuarterCount !== 1 ? 's' : ''} created`}
           </p>
         </Card>
       </div>
@@ -57,10 +103,19 @@ export default function Dashboard() {
             <h2 className="text-sm font-semibold text-slate-700">Clients</h2>
             <Link to="/clients" className="text-xs text-blue-600 hover:underline">View all</Link>
           </div>
+          <input
+            type="text"
+            value={clientSearch}
+            onChange={e => setClientSearch(e.target.value)}
+            placeholder="Search clients..."
+            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
           <div className="space-y-2">
             {clientsLoading
-              ? <p className="text-sm text-slate-400">Loading…</p>
-              : clients.slice(0, 8).map(client => (
+              ? Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))
+              : filteredClients.slice(0, 8).map(client => (
                 <Link
                   key={client.id}
                   to={`/clients/${client.id}`}
@@ -80,7 +135,13 @@ export default function Dashboard() {
             <h2 className="text-sm font-semibold text-slate-700">Recent Tax Plans</h2>
           </div>
           {reportsLoading
-            ? <p className="text-sm text-slate-400">Loading…</p>
+            ? (
+              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden p-4 space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-10 w-full" />
+                ))}
+              </div>
+            )
             : (
               <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                 <table className="w-full text-sm">

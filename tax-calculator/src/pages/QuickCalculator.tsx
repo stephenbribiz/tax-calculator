@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { useForm } from 'react-hook-form'
 import type { TaxInput, TaxOutput, Step3Data, CompanyType, FilingStatus, Quarter, StateCode } from '@/types'
 import { calculateTax } from '@/tax-engine'
+import { useUnsavedChangesWarning } from '@/hooks/useUnsavedChangesWarning'
 import { defaultStep3 } from '@/hooks/useFormState'
 import { Select } from '@/components/ui/Select'
 import { Input } from '@/components/ui/Input'
@@ -38,6 +39,9 @@ export default function QuickCalculator() {
   const [financials, setFinancials] = useState<Step3Data>(defaultStep3)
   const [output, setOutput] = useState<TaxOutput | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Warn before leaving with unsaved changes on financials or results step
+  useUnsavedChangesWarning(step === 'financials' || step === 'results')
 
   const { register, handleSubmit, formState: { errors } } = useForm<ProfileData>({
     defaultValues: {
@@ -194,6 +198,7 @@ export default function QuickCalculator() {
             companyType={profile.companyType}
             filingStatus={profile.filingStatus}
             taxYear={profile.taxYear}
+            ownershipPct={profile.ownershipPct}
             onSubmit={handleFinancials}
             onBack={() => setStep('profile')}
           />

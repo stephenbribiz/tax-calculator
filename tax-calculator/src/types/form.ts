@@ -44,3 +44,5 @@ export type FormAction =
   | { type: 'GO_TO_STEP'; payload: 1 | 2 | 3 | 'results' }
   | { type: 'LOAD_CLIENT'; payload: Partial<Step1Data & Step2Data> }
   | { type: 'RESET' }
+  | { type: 'CLEAR_DRAFT' }
+  | { type: 'LOAD_DRAFT'; payload: { step1: Step1Data; step2: Step2Data; step3: Step3Data } }

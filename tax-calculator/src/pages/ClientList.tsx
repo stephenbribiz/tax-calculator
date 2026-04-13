@@ -1,9 +1,17 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useClients } from '@/hooks/useClients'
 import { Button } from '@/components/ui/Button'
 
 export default function ClientList() {
   const { clients, loading } = useClients()
+  const [search, setSearch] = useState('')
+
+  const filteredClients = clients.filter(c => {
+    if (!search) return true
+    const q = search.toLowerCase()
+    return c.owner_name.toLowerCase().includes(q) || c.company_name.toLowerCase().includes(q)
+  })
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -13,6 +21,14 @@ export default function ClientList() {
           <Button size="sm">+ New Client</Button>
         </Link>
       </div>
+
+      <input
+        type="text"
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        placeholder="Search clients..."
+        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+      />
 
       {loading
         ? <p className="text-sm text-slate-400">Loading…</p>
@@ -29,15 +45,18 @@ export default function ClientList() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {clients.length === 0
+                {filteredClients.length === 0
                   ? (
                     <tr>
                       <td colSpan={5} className="text-center text-slate-400 py-8">
-                        No clients yet. <Link to="/clients/new" className="text-blue-600 hover:underline">Add your first client →</Link>
+                        {clients.length === 0
+                          ? <>No clients yet. <Link to="/clients/new" className="text-blue-600 hover:underline">Add your first client →</Link></>
+                          : 'No clients match your search.'
+                        }
                       </td>
                     </tr>
                   )
-                  : clients.map(client => (
+                  : filteredClients.map(client => (
                     <tr key={client.id} className="hover:bg-slate-50">
                       <td className="px-5 py-3">
                         <Link to={`/clients/${client.id}`} className="font-medium text-blue-600 hover:underline">

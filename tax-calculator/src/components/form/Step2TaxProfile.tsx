@@ -76,7 +76,11 @@ export function Step2TaxProfile({ defaultValues, onSubmit, onBack }: Step2Props)
           type="number"
           min="0"
           hint="Qualifying children under age 17 for Child Tax Credit"
-          {...register('numDependentChildren', { valueAsNumber: true, min: 0 })}
+          error={errors.numDependentChildren?.message}
+          {...register('numDependentChildren', {
+            valueAsNumber: true,
+            min: { value: 0, message: 'Cannot be negative' },
+          })}
         />
       </div>
 
