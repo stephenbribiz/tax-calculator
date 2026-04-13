@@ -21,6 +21,8 @@ export interface TaxInput {
   // Step 3 — Financial Data
   businessNetIncome: number
   shareholderSalary: number  // S-Corp only, 0 otherwise
+  adjustedSalary: number     // S-Corp: user-set target salary for reasonable comp (0 = no adjustment)
+  federalWithholding: number // S-Corp: federal income tax already withheld via payroll
   mealExpense: number        // 50% deductible
   shareholderDraw: number    // informational only (not deductible)
   otherIncome: number
@@ -66,7 +68,8 @@ export interface StateResult {
   stateName: string
   stateCode: StateCode
   stateIncomeTax: number
-  franchiseTax: number
+  exciseTax: number           // TN: 6.5% excise on net earnings
+  franchiseTax: number        // TN: 0.25% franchise on net worth (estimated)
   stateDeduction: number
   effectiveStateRate: number
   notes: string[]
@@ -75,16 +78,19 @@ export interface StateResult {
 export interface SCorpAnalysis {
   currentSalary: number
   recommendedMinSalary: number
+  adjustedSalary: number          // user-chosen target salary (may differ from recommended)
   currentFICA: number
   recommendedFICA: number
-  ficaGap: number
+  adjustedFICA: number            // FICA at adjusted salary
+  additionalFICA: number          // adjustedFICA - currentFICA (added to tax total)
+  ficaGap: number                 // recommendedFICA - currentFICA (informational)
   isSalaryReasonable: boolean
   warningMessage: string | null
 }
 
 export interface TaxOutput {
   // Derived intermediate values
-  annualizedBusinessIncome: number
+  annualizedBusinessIncome: number | null
   allocatedBusinessIncome: number
   mealAddBack: number
   seTaxDeduction: number

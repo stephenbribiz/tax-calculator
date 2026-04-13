@@ -52,14 +52,32 @@ export function Step3FinancialData({
           )} />
 
           {isScorp && (
-            <Controller name="shareholderSalary" control={control} render={({ field }) => (
-              <CurrencyInput
-                label="Shareholder Salary (W-2)"
-                hint="Annual W-2 salary paid to the shareholder. FICA taxes already withheld will be accounted for."
-                value={field.value}
-                onChange={field.onChange}
-              />
-            )} />
+            <>
+              <Controller name="shareholderSalary" control={control} render={({ field }) => (
+                <CurrencyInput
+                  label="Current Shareholder Salary (W-2)"
+                  hint="Annual W-2 salary paid to the shareholder. FICA taxes already withheld will be accounted for."
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              )} />
+              <Controller name="adjustedSalary" control={control} render={({ field }) => (
+                <CurrencyInput
+                  label="Adjusted Salary for Reasonable Comp"
+                  hint="Optional: enter a target salary to see additional FICA impact. Leave at 0 for no adjustment."
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              )} />
+              <Controller name="federalWithholding" control={control} render={({ field }) => (
+                <CurrencyInput
+                  label="Federal Income Tax Withheld (YTD)"
+                  hint="Federal income tax already withheld from shareholder payroll this year."
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              )} />
+            </>
           )}
 
           <Controller name="mealExpense" control={control} render={({ field }) => (

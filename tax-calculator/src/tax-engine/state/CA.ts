@@ -82,6 +82,7 @@ export function calculateCA(
     stateName: 'California',
     stateCode: 'CA',
     stateIncomeTax: businessStateTax,
+    exciseTax: 0,
     franchiseTax: 0,
     stateDeduction,
     effectiveStateRate: effectiveRate,

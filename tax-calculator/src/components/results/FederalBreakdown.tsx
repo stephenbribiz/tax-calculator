@@ -14,7 +14,7 @@ function Row({ label, value, muted, indent }: { label: string; value: string; mu
 }
 
 export function FederalBreakdown({ input, output }: Props) {
-  const { federal } = output
+  const { federal, scorp } = output
   const isScorp = input.companyType === 'S-Corp'
   const label = `${input.quarter} ${input.taxYear} (${output.quarterProration * 100}% proration)`
 
@@ -33,20 +33,29 @@ export function FederalBreakdown({ input, output }: Props) {
             <Row label="FICA — Employer Portion (est.)" value={formatCurrency(federal.ficaAlreadyPaid / 2)} indent />
             <Row label="FICA — Employee Portion (est.)" value={formatCurrency(federal.ficaAlreadyPaid / 2)} indent />
             <Row label="FICA Already Paid via Payroll" value={`− ${formatCurrency(federal.ficaAlreadyPaid)}`} />
+            {scorp && scorp.additionalFICA > 0 && (
+              <Row
+                label={`Additional FICA (salary adj. to ${formatCurrency(scorp.adjustedSalary)})`}
+                value={`+ ${formatCurrency(scorp.additionalFICA)}`}
+              />
+            )}
+            {input.federalWithholding > 0 && (
+              <Row label="Federal Income Tax Withheld" value={`− ${formatCurrency(input.federalWithholding)}`} />
+            )}
           </>
         ) : (
           <>
             <Row label="Self-Employment Tax" value={formatCurrency(federal.seTax)} />
-            <Row label="Social Security (12.4%)" value={formatCurrency(federal.seSocialSecurity)} indent />
-            <Row label="Medicare (2.9%)" value={formatCurrency(federal.seMedicare)} indent />
+            <Row label="Social Security (12.4%)" value={formatCurrency(federal.seSocialSecurity)} indent muted />
+            <Row label="Medicare (2.9%)" value={formatCurrency(federal.seMedicare)} indent muted />
             {federal.seAdditionalMedicare > 0 && (
-              <Row label="Additional Medicare (0.9%)" value={formatCurrency(federal.seAdditionalMedicare)} indent />
+              <Row label="Additional Medicare (0.9%)" value={formatCurrency(federal.seAdditionalMedicare)} indent muted />
             )}
           </>
         )}
 
         <div className="flex justify-between items-center py-2 mt-1">
-          <span className="text-sm font-semibold text-slate-800">Federal Total (before proration)</span>
+          <span className="text-sm font-semibold text-slate-800">Federal Total</span>
           <span className="text-sm font-bold text-slate-900">{formatCurrency(federal.totalFederalBeforeProration)}</span>
         </div>
         <div className="flex justify-between items-center py-1.5 bg-blue-50 -mx-1 px-1 rounded">

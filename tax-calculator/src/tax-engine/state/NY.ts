@@ -73,6 +73,7 @@ export function calculateNY(
     stateName: 'New York',
     stateCode: 'NY',
     stateIncomeTax,
+    exciseTax: 0,
     franchiseTax: 0,
     stateDeduction,
     effectiveStateRate: effectiveRate,

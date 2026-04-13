@@ -1,4 +1,4 @@
-import type { StateResult, StateCode, FilingStatus } from '@/types'
+import type { StateResult, StateCode, FilingStatus, CompanyType } from '@/types'
 import { calculateTN } from './TN'
 import { calculateCA } from './CA'
 import { calculateGA } from './GA'
@@ -14,13 +14,15 @@ export interface StateCalcInput {
   taxableIncome: number
   filingStatus: FilingStatus
   year: number
+  companyType?: CompanyType
+  businessNetIncome?: number
 }
 
 export function calculateStateTax(input: StateCalcInput): StateResult {
-  const { state, allocatedBusinessIncome, taxableIncome, filingStatus, year } = input
+  const { state, allocatedBusinessIncome, taxableIncome, filingStatus, year, companyType, businessNetIncome } = input
 
   switch (state) {
-    case 'TN': return calculateTN(allocatedBusinessIncome, taxableIncome, filingStatus, year)
+    case 'TN': return calculateTN(allocatedBusinessIncome, taxableIncome, filingStatus, year, companyType, businessNetIncome)
     case 'CA': return calculateCA(allocatedBusinessIncome, taxableIncome, filingStatus, year)
     case 'GA': return calculateGA(allocatedBusinessIncome, taxableIncome, filingStatus, year)
     case 'NC': return calculateNC(allocatedBusinessIncome, taxableIncome, filingStatus, year)

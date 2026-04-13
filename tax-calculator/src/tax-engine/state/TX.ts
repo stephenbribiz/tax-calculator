@@ -13,6 +13,7 @@ export function calculateTX(
     stateName: 'Texas',
     stateCode: 'TX',
     stateIncomeTax: 0,
+    exciseTax: 0,
     franchiseTax: 0,
     stateDeduction: 0,
     effectiveStateRate: 0,

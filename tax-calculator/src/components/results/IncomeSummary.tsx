@@ -17,6 +17,10 @@ function Row({ label, value, sub }: { label: string; value: string; sub?: string
 }
 
 export function IncomeSummary({ input, output }: Props) {
+  const annualizedNote = output.annualizedBusinessIncome
+    ? `Based on annualized income of ${formatCurrency(output.annualizedBusinessIncome)}`
+    : undefined
+
   return (
     <Card>
       <SectionHeader title="Income Summary" subtitle={`${input.quarter} ${input.taxYear} — ${output.quarterProration * 100}% of year`} />
@@ -24,7 +28,6 @@ export function IncomeSummary({ input, output }: Props) {
         <Row
           label="Business Net Income"
           value={formatCurrency(input.businessNetIncome)}
-          sub={input.annualizeIncome ? `Annualized: ${formatCurrency(output.annualizedBusinessIncome)}` : undefined}
         />
         <Row
           label={`Allocated to Owner (${input.ownershipPct}%)`}
@@ -42,7 +45,9 @@ export function IncomeSummary({ input, output }: Props) {
         <Row
           label="Deduction Applied"
           value={`− ${formatCurrency(output.effectiveDeduction)}`}
-          sub={output.effectiveDeduction !== output.standardDeduction ? 'Itemized' : 'Standard'}
+          sub={output.effectiveDeduction !== output.standardDeduction
+            ? 'Itemized'
+            : `Standard (prorated for ${input.quarter})`}
         />
         {(input.otherIncome > 0 || input.spousalIncome > 0) && (
           <Row
@@ -58,10 +63,12 @@ export function IncomeSummary({ input, output }: Props) {
         <Row
           label="Marginal Tax Rate"
           value={formatPercent(output.federal.marginalRate)}
+          sub={annualizedNote}
         />
         <Row
           label="Effective Federal Rate"
           value={formatPercent(output.federal.effectiveFederalRate)}
+          sub={annualizedNote}
         />
       </div>
     </Card>

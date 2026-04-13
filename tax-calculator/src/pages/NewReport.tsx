@@ -30,6 +30,8 @@ function toTaxInput(s1: Step1Data, s2: Step2Data, s3: Step3Data): TaxInput {
     state:                s2.state,
     businessNetIncome:    s3.businessNetIncome,
     shareholderSalary:    s3.shareholderSalary,
+    adjustedSalary:       s3.adjustedSalary,
+    federalWithholding:   s3.federalWithholding,
     mealExpense:          s3.mealExpense,
     shareholderDraw:      s3.shareholderDraw,
     otherIncome:          s3.otherIncome,

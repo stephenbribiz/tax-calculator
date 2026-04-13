@@ -29,6 +29,7 @@ export function calculateNC(
     stateName: 'North Carolina',
     stateCode: 'NC',
     stateIncomeTax,
+    exciseTax: 0,
     franchiseTax: 0,
     stateDeduction,
     effectiveStateRate: rate,

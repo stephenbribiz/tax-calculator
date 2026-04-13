@@ -32,6 +32,7 @@ export function calculateGA(
     stateName: 'Georgia',
     stateCode: 'GA',
     stateIncomeTax,
+    exciseTax: 0,
     franchiseTax: 0,
     stateDeduction,
     effectiveStateRate: rate,

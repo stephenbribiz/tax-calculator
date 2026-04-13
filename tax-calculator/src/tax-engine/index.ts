@@ -18,60 +18,188 @@ export function calculateTax(input: TaxInput): TaxOutput {
   const taxData = getTaxDataByYear(input.taxYear)
   const proration = PRORATION_MAP[input.quarter]
 
-  // 1. Annualize business income if requested (project one quarter to full year)
-  const effectiveBusinessIncome = input.annualizeIncome && proration > 0
-    ? input.businessNetIncome / proration
-    : input.businessNetIncome
+  // 1. Actual (non-annualized) allocated income — used for SE tax and display
+  const actualAllocatedIncome = input.businessNetIncome * (input.ownershipPct / 100)
 
-  // 2. Apply ownership percentage
-  const allocatedBusinessIncome = effectiveBusinessIncome * (input.ownershipPct / 100)
+  // 2. Annualized income — only for bracket determination when annualizeIncome is on
+  const isAnnualizing = input.annualizeIncome && proration > 0 && proration < 1
+  const annualizedAllocatedIncome = isAnnualizing
+    ? actualAllocatedIncome / proration
+    : null
 
-  // 3. Meal add-back: net income already has 100% of meals deducted; only 50% is deductible,
-  //    so add the non-deductible 50% back to income.
+  // 3. Meal add-back (50% non-deductible)
   const mealAddBack = input.mealExpense * 0.5
 
-  // 4. Adjusted net income for SE tax purposes
-  const seNetIncome = Math.max(0, allocatedBusinessIncome + mealAddBack)
-
-  // 5. SE tax (non-S-Corp only) + above-the-line deduction (50%)
+  // 4. SE tax always on actual income
+  const seNetIncome = Math.max(0, actualAllocatedIncome + mealAddBack)
   const seTaxResult = calculateSETax(seNetIncome, input.taxYear, input.companyType)
 
-  // 6. For S-Corp: FICA already paid via payroll
+  // 5. FICA for S-Corp
   const ficaResult = calculateFICA(input.shareholderSalary, input.taxYear)
 
-  // 7. Effective deduction (standard or itemized override)
+  // 6. Deduction — prorated by quarter
   const standardDeduction = taxData.standardDeduction[input.filingStatus]
-  const effectiveDeduction = input.deductionOverride !== null
-    ? input.deductionOverride
-    : standardDeduction
+  const fullDeduction = input.deductionOverride !== null ? input.deductionOverride : standardDeduction
+  const proratedDeduction = fullDeduction * proration
 
-  // 8. Total AGI (all income sources — used for bracket placement)
-  const totalAGI = allocatedBusinessIncome
+  // 7. AGI and taxable income (actual — for display and non-annualized calc)
+  const totalAGI = actualAllocatedIncome
     + input.otherIncome
     + input.spousalIncome
     + mealAddBack
     - seTaxResult.deductibleHalf
 
-  // 9. Total taxable income (including spousal/other — for correct bracket assignment)
-  const taxableIncome = Math.max(0, totalAGI - effectiveDeduction)
+  const taxableIncome = Math.max(0, totalAGI - proratedDeduction)
 
-  // 10. Business-only taxable income (for ratio calculation — drives quarterly estimate)
+  // 8. Business-only income
   const businessAdjustedIncome = Math.max(0,
-    allocatedBusinessIncome
-    + mealAddBack
-    - seTaxResult.deductibleHalf
+    actualAllocatedIncome + mealAddBack - seTaxResult.deductibleHalf
   )
-  const businessTaxableIncome = Math.max(0, businessAdjustedIncome - effectiveDeduction)
+  const businessTaxableIncome = Math.max(0, businessAdjustedIncome - proratedDeduction)
 
-  // 11. QBI deduction (on business income, limited by total taxable income)
-  const qbiDeduction = calculateQBI(businessAdjustedIncome, taxableIncome, input.filingStatus, taxData)
+  // 9. QBI deduction (prorated — it's an annual deduction)
+  const fullQbiDeduction = calculateQBI(businessAdjustedIncome, taxableIncome, input.filingStatus, taxData)
+  const qbiDeduction = fullQbiDeduction * proration
 
-  // Re-derive taxable income with QBI applied
   const taxableIncomeWithQBI = Math.max(0, taxableIncome - qbiDeduction)
   const businessTaxableWithQBI = Math.max(0, businessTaxableIncome - qbiDeduction)
 
-  // 12. Federal income tax calculation
-  const federal = calculateFederal({
+  // 10. S-Corp analysis — based on actual (not annualized) quarter income
+  const scorp = input.companyType === 'S-Corp'
+    ? analyzeReasonableComp(actualAllocatedIncome, input.shareholderSalary, input.adjustedSalary, input.taxYear)
+    : null
+
+  // Additional FICA from salary adjustment (added to tax total)
+  const additionalFICA = scorp?.additionalFICA ?? 0
+
+  // Federal withholding already paid (S-Corp only)
+  const federalWithholding = input.companyType === 'S-Corp' ? input.federalWithholding : 0
+
+  let federal
+  let totalFederalOwed: number
+  let totalStateOwed: number
+
+  if (isAnnualizing) {
+    // ── ANNUALIZED PATH ──
+    // Calculate full-year tax on annualized income with full deduction/credit,
+    // then take the quarterly share. This gives correct bracket placement.
+    const annAllocated = annualizedAllocatedIncome!
+    const annSENet = Math.max(0, annAllocated + mealAddBack)
+    const annSETax = calculateSETax(annSENet, input.taxYear, input.companyType)
+
+    const annAGI = annAllocated + input.otherIncome + input.spousalIncome + mealAddBack - annSETax.deductibleHalf
+    const annTaxable = Math.max(0, annAGI - fullDeduction)
+    const annBusinessAdj = Math.max(0, annAllocated + mealAddBack - annSETax.deductibleHalf)
+    const annBusinessTaxable = Math.max(0, annBusinessAdj - fullDeduction)
+
+    const annQBI = calculateQBI(annBusinessAdj, annTaxable, input.filingStatus, taxData)
+    const annTaxableWithQBI = Math.max(0, annTaxable - annQBI)
+    const annBusinessTaxableWithQBI = Math.max(0, annBusinessTaxable - annQBI)
+
+    const annFederal = calculateFederal({
+      taxableIncome: annTaxableWithQBI,
+      totalAGI: annAGI,
+      businessTaxableIncome: annBusinessTaxableWithQBI,
+      filingStatus: input.filingStatus,
+      companyType: input.companyType,
+      shareholderSalary: input.shareholderSalary,
+      seTax: annSETax.seTax,
+      seSocialSecurity: annSETax.socialSecurity,
+      seMedicare: annSETax.medicare,
+      seAdditionalMedicare: annSETax.additionalMedicare,
+      numDependentChildren: input.numDependentChildren,
+      taxData,
+    })
+
+    // Prorate the full-year federal result to get the quarterly share
+    federal = {
+      ...annFederal,
+      // Override SE tax breakdown with actual (not annualized) SE tax
+      seTax: seTaxResult.seTax,
+      seSocialSecurity: seTaxResult.socialSecurity,
+      seMedicare: seTaxResult.medicare,
+      seAdditionalMedicare: seTaxResult.additionalMedicare,
+      // Prorate credits for display
+      childTaxCredit: annFederal.childTaxCredit * proration,
+    }
+
+    // Federal: prorate income tax portion, use actual SE tax
+    const proratedIncomeTax = annFederal.netIncomeTax * proration
+    const businessRatio = annTaxableWithQBI > 0
+      ? Math.min(1, annBusinessTaxableWithQBI / annTaxableWithQBI)
+      : 1
+    const proratedBusinessIncomeTax = proratedIncomeTax * businessRatio
+
+    const federalBeforeProration = proratedBusinessIncomeTax + seTaxResult.seTax + additionalFICA
+    const adjustedFederalTotal = Math.max(0, federalBeforeProration - ficaResult.totalFICA - federalWithholding)
+
+    federal = {
+      ...federal,
+      grossIncomeTax: annFederal.grossIncomeTax * proration,
+      netIncomeTax: proratedIncomeTax,
+      ficaAlreadyPaid: ficaResult.totalFICA,
+      totalFederalBeforeProration: adjustedFederalTotal,
+    }
+
+    totalFederalOwed = adjustedFederalTotal
+
+    // State: prorate annualized state tax
+    const annState = calculateStateTax({
+      state: input.state,
+      allocatedBusinessIncome: annBusinessAdj,
+      taxableIncome: annTaxableWithQBI,
+      filingStatus: input.filingStatus,
+      year: input.taxYear,
+      companyType: input.companyType,
+      businessNetIncome: input.businessNetIncome,
+    })
+    totalStateOwed = annState.stateIncomeTax * proration
+
+    // Use actual state calc for display (rates etc.)
+    const state = calculateStateTax({
+      state: input.state,
+      allocatedBusinessIncome: businessAdjustedIncome,
+      taxableIncome: taxableIncomeWithQBI,
+      filingStatus: input.filingStatus,
+      year: input.taxYear,
+      companyType: input.companyType,
+      businessNetIncome: input.businessNetIncome,
+    })
+
+    // Add entity-level taxes (excise + franchise) — not prorated, these are annual
+    const entityLevelTax = state.exciseTax + state.franchiseTax
+    totalStateOwed += entityLevelTax
+
+    const totalTaxOwed = totalFederalOwed + totalStateOwed
+    const netAmountDue = Math.max(0, totalTaxOwed - input.priorEstimatesPaid)
+
+    return {
+      annualizedBusinessIncome: annualizedAllocatedIncome,
+      allocatedBusinessIncome: actualAllocatedIncome,
+      mealAddBack,
+      seTaxDeduction: seTaxResult.deductibleHalf,
+      qbiDeduction,
+      standardDeduction,
+      effectiveDeduction: proratedDeduction,
+      taxableIncome: taxableIncomeWithQBI,
+      totalAGI,
+
+      federal,
+      state,
+      scorp,
+
+      quarterProration: proration,
+      totalFederalOwed,
+      totalStateOwed,
+      totalTaxOwed,
+      priorEstimatesPaid: input.priorEstimatesPaid,
+      netAmountDue,
+    }
+  }
+
+  // ── NON-ANNUALIZED PATH ──
+  // Use actual income with prorated deduction/credit. No final proration.
+  federal = calculateFederal({
     taxableIncome: taxableIncomeWithQBI,
     totalAGI,
     businessTaxableIncome: businessTaxableWithQBI,
@@ -86,48 +214,59 @@ export function calculateTax(input: TaxInput): TaxOutput {
     taxData,
   })
 
-  // For S-Corp: reduce federal owed by FICA already paid
-  const adjustedFederalTotal = Math.max(0,
-    federal.totalFederalBeforeProration - ficaResult.totalFICA
-  )
-  const adjustedFederal = {
+  // Prorate the child tax credit
+  federal = {
+    ...federal,
+    childTaxCredit: federal.childTaxCredit * proration,
+    netIncomeTax: Math.max(0, federal.grossIncomeTax - federal.childTaxCredit * proration),
+  }
+
+  // Recalculate totals with prorated credit
+  const businessRatio = taxableIncomeWithQBI > 0
+    ? Math.min(1, businessTaxableWithQBI / taxableIncomeWithQBI)
+    : 1
+  const businessIncomeTax = federal.netIncomeTax * businessRatio
+  const federalTotal = businessIncomeTax + seTaxResult.seTax + additionalFICA
+  const adjustedFederalTotal = Math.max(0, federalTotal - ficaResult.totalFICA - federalWithholding)
+
+  federal = {
     ...federal,
     ficaAlreadyPaid: ficaResult.totalFICA,
     totalFederalBeforeProration: adjustedFederalTotal,
   }
 
-  // 13. State tax (on business income + allocations)
+  totalFederalOwed = adjustedFederalTotal // no proration — already prorated via deduction/credit
+
   const state = calculateStateTax({
     state: input.state,
     allocatedBusinessIncome: businessAdjustedIncome,
     taxableIncome: taxableIncomeWithQBI,
     filingStatus: input.filingStatus,
     year: input.taxYear,
+    companyType: input.companyType,
+    businessNetIncome: input.businessNetIncome,
   })
+  totalStateOwed = state.stateIncomeTax // no proration
 
-  // 14. S-Corp salary analysis
-  const scorp = input.companyType === 'S-Corp'
-    ? analyzeReasonableComp(allocatedBusinessIncome, input.shareholderSalary, input.taxYear)
-    : null
+  // Add entity-level taxes (excise + franchise)
+  const entityLevelTax = state.exciseTax + state.franchiseTax
+  totalStateOwed += entityLevelTax
 
-  // 15. Prorate and compute totals
-  const totalFederalOwed = adjustedFederal.totalFederalBeforeProration * proration
-  const totalStateOwed = state.stateIncomeTax * proration
   const totalTaxOwed = totalFederalOwed + totalStateOwed
   const netAmountDue = Math.max(0, totalTaxOwed - input.priorEstimatesPaid)
 
   return {
-    annualizedBusinessIncome: effectiveBusinessIncome,
-    allocatedBusinessIncome,
+    annualizedBusinessIncome: null,
+    allocatedBusinessIncome: actualAllocatedIncome,
     mealAddBack,
     seTaxDeduction: seTaxResult.deductibleHalf,
     qbiDeduction,
     standardDeduction,
-    effectiveDeduction,
+    effectiveDeduction: proratedDeduction,
     taxableIncome: taxableIncomeWithQBI,
     totalAGI,
 
-    federal: adjustedFederal,
+    federal,
     state,
     scorp,
 

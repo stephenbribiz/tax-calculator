@@ -37,15 +37,30 @@ export function SCorpAnalysis({ scorp }: Props) {
         <Row label="FICA at Recommended Salary" value={formatCurrency(scorp.recommendedFICA)} />
         {scorp.ficaGap > 0 && (
           <div className="flex justify-between items-center py-1.5">
-            <span className="text-sm text-amber-700 font-medium">Additional FICA if Salary Adjusted</span>
+            <span className="text-sm text-amber-700 font-medium">FICA Gap (recommended vs current)</span>
             <span className="text-sm font-bold text-amber-700">+ {formatCurrency(scorp.ficaGap)}</span>
           </div>
         )}
       </div>
 
+      {scorp.adjustedSalary > 0 && (
+        <div className="mt-4 pt-3 border-t border-slate-200">
+          <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Payroll Adjustment</h4>
+          <div className="divide-y divide-slate-100">
+            <Row label="Adjusted Salary" value={formatCurrency(scorp.adjustedSalary)} />
+            <Row label="FICA at Adjusted Salary" value={formatCurrency(scorp.adjustedFICA)} />
+            <div className="flex justify-between items-center py-1.5">
+              <span className="text-sm text-blue-700 font-medium">Additional FICA (added to tax total)</span>
+              <span className="text-sm font-bold text-blue-700">+ {formatCurrency(scorp.additionalFICA)}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <p className="text-xs text-slate-400 mt-3">
         The 40% threshold is a common practice guideline, not an IRS-mandated formula. Reasonable compensation
-        is based on market rates for the services performed.
+        is based on market rates for the services performed. Use the "Adjusted Salary" field in Step 3 to model
+        the FICA impact of a salary change.
       </p>
     </Card>
   )

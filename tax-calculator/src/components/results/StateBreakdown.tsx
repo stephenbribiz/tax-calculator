@@ -7,6 +7,7 @@ interface Props { input: TaxInput; output: TaxOutput }
 export function StateBreakdown({ input, output }: Props) {
   const { state } = output
   const hasStateTax = state.stateIncomeTax > 0
+  const hasEntityTax = state.exciseTax > 0 || state.franchiseTax > 0
 
   return (
     <Card>
@@ -26,14 +27,35 @@ export function StateBreakdown({ input, output }: Props) {
               <span className="text-sm text-slate-600">State Income Tax (before proration)</span>
               <span className="text-sm font-medium text-slate-900">{formatCurrency(state.stateIncomeTax)}</span>
             </div>
-            <div className="flex justify-between items-center py-1.5 bg-blue-50 -mx-1 px-1 rounded">
-              <span className="text-sm font-semibold text-blue-800">State Owed for {input.quarter}</span>
-              <span className="text-sm font-bold text-blue-900">{formatCurrency(output.totalStateOwed)}</span>
-            </div>
           </>
         ) : (
           <p className="text-sm text-slate-500 py-2">No individual state income tax for {state.stateName}.</p>
         )}
+
+        {hasEntityTax && (
+          <>
+            <div className="pt-2 pb-1">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Entity-Level Taxes</span>
+            </div>
+            {state.exciseTax > 0 && (
+              <div className="flex justify-between items-center py-1.5">
+                <span className="text-sm text-slate-600">Excise Tax (6.5% on net earnings)</span>
+                <span className="text-sm font-medium text-slate-900">{formatCurrency(state.exciseTax)}</span>
+              </div>
+            )}
+            {state.franchiseTax > 0 && (
+              <div className="flex justify-between items-center py-1.5">
+                <span className="text-sm text-slate-600">Franchise Tax (minimum)</span>
+                <span className="text-sm font-medium text-slate-900">{formatCurrency(state.franchiseTax)}</span>
+              </div>
+            )}
+          </>
+        )}
+
+        <div className="flex justify-between items-center py-1.5 bg-blue-50 -mx-1 px-1 rounded">
+          <span className="text-sm font-semibold text-blue-800">State Owed for {input.quarter}</span>
+          <span className="text-sm font-bold text-blue-900">{formatCurrency(output.totalStateOwed)}</span>
+        </div>
       </div>
 
       {state.notes.length > 0 && (

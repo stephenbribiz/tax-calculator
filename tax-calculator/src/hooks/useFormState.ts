@@ -20,6 +20,8 @@ const defaultStep2: Step2Data = {
 const defaultStep3: Step3Data = {
   businessNetIncome:  0,
   shareholderSalary:  0,
+  adjustedSalary:     0,
+  federalWithholding: 0,
   mealExpense:        0,
   shareholderDraw:    0,
   otherIncome:        0,

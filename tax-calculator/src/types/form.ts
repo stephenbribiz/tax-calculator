@@ -19,6 +19,8 @@ export interface Step2Data {
 export interface Step3Data {
   businessNetIncome: number
   shareholderSalary: number
+  adjustedSalary: number        // S-Corp: target salary for reasonable comp (0 = no adjustment)
+  federalWithholding: number    // S-Corp: federal income tax already withheld via payroll
   mealExpense: number
   shareholderDraw: number
   otherIncome: number

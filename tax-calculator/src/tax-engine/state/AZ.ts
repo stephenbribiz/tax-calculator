@@ -26,6 +26,7 @@ export function calculateAZ(
     stateName: 'Arizona',
     stateCode: 'AZ',
     stateIncomeTax,
+    exciseTax: 0,
     franchiseTax: 0,
     stateDeduction,
     effectiveStateRate: AZ_RATE,

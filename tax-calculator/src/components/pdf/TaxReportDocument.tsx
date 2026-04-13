@@ -21,6 +21,9 @@ export function TaxReportDocument({ input, output }: Props) {
   const { federal, state, scorp } = output
   const isScorp = input.companyType === 'S-Corp'
   const periodLabel = `${input.quarter} ${input.taxYear} (${output.quarterProration * 100}% of year)`
+  const annualizedNote = output.annualizedBusinessIncome
+    ? `Rate based on annualized income of ${formatCurrency(output.annualizedBusinessIncome)}`
+    : undefined
 
   return (
     <Document title={`Tax Estimate — ${input.ownerName} ${input.quarter} ${input.taxYear}`}>
@@ -45,9 +48,6 @@ export function TaxReportDocument({ input, output }: Props) {
         <View style={s.section}>
           <Text style={s.sectionTitle}>Income Summary</Text>
           <Row label="Business Net Income" value={formatCurrency(input.businessNetIncome)} />
-          {input.annualizeIncome && (
-            <Row label="Annualized Business Income" value={formatCurrency(output.annualizedBusinessIncome)} />
-          )}
           <Row label={`Allocated to Owner (${input.ownershipPct}%)`} value={formatCurrency(output.allocatedBusinessIncome)} />
           {output.mealAddBack > 0 && (
             <Row label="Meal Add-Back (50% non-deductible)" value={`+ ${formatCurrency(output.mealAddBack)}`} />
@@ -59,7 +59,7 @@ export function TaxReportDocument({ input, output }: Props) {
             <Row label="QBI Deduction (20%)" value={`− ${formatCurrency(output.qbiDeduction)}`} />
           )}
           <Row
-            label={`Deduction (${output.effectiveDeduction !== output.standardDeduction ? 'Itemized' : 'Standard'})`}
+            label={`Deduction (${output.effectiveDeduction !== output.standardDeduction ? 'Itemized' : 'Standard'}, prorated for ${input.quarter})`}
             value={`− ${formatCurrency(output.effectiveDeduction)}`}
           />
           {(input.otherIncome > 0 || input.spousalIncome > 0) && (
@@ -75,6 +75,9 @@ export function TaxReportDocument({ input, output }: Props) {
           </View>
           <Row label="Marginal Tax Rate" value={formatPercent(federal.marginalRate)} />
           <Row label="Effective Federal Rate" value={formatPercent(federal.effectiveFederalRate)} />
+          {annualizedNote && (
+            <Text style={s.noteText}>{annualizedNote}</Text>
+          )}
         </View>
 
         {/* Federal Tax Breakdown */}
@@ -86,7 +89,15 @@ export function TaxReportDocument({ input, output }: Props) {
           )}
           <Row label="Net Federal Income Tax" value={formatCurrency(federal.netIncomeTax)} />
           {isScorp ? (
-            <Row label="FICA Paid via Payroll (est.)" value={`− ${formatCurrency(federal.ficaAlreadyPaid)}`} />
+            <>
+              <Row label="FICA Paid via Payroll (est.)" value={`− ${formatCurrency(federal.ficaAlreadyPaid)}`} />
+              {scorp && scorp.additionalFICA > 0 && (
+                <Row label={`Additional FICA (adj. salary ${formatCurrency(scorp.adjustedSalary)})`} value={`+ ${formatCurrency(scorp.additionalFICA)}`} />
+              )}
+              {input.federalWithholding > 0 && (
+                <Row label="Federal Income Tax Withheld" value={`− ${formatCurrency(input.federalWithholding)}`} />
+              )}
+            </>
           ) : (
             <>
               <Row label="Self-Employment Tax" value={formatCurrency(federal.seTax)} />
@@ -97,10 +108,6 @@ export function TaxReportDocument({ input, output }: Props) {
               )}
             </>
           )}
-          <View style={s.subtotalRow}>
-            <Text style={s.subtotalLabel}>Federal Total (before proration)</Text>
-            <Text style={s.subtotalValue}>{formatCurrency(federal.totalFederalBeforeProration)}</Text>
-          </View>
           <View style={s.subtotalRow}>
             <Text style={s.subtotalLabel}>Federal Owed for {input.quarter}</Text>
             <Text style={s.subtotalValue}>{formatCurrency(output.totalFederalOwed)}</Text>
@@ -121,7 +128,14 @@ export function TaxReportDocument({ input, output }: Props) {
             <Row label="FICA on Current Salary (employer + employee)" value={formatCurrency(scorp.currentFICA)} />
             <Row label="FICA at Recommended Salary" value={formatCurrency(scorp.recommendedFICA)} />
             {scorp.ficaGap > 0 && (
-              <Row label="Additional FICA if Salary Adjusted" value={`+ ${formatCurrency(scorp.ficaGap)}`} />
+              <Row label="FICA Gap (recommended vs current)" value={`+ ${formatCurrency(scorp.ficaGap)}`} />
+            )}
+            {scorp.adjustedSalary > 0 && (
+              <>
+                <Row label="Adjusted Salary" value={formatCurrency(scorp.adjustedSalary)} />
+                <Row label="FICA at Adjusted Salary" value={formatCurrency(scorp.adjustedFICA)} />
+                <Row label="Additional FICA (added to tax total)" value={`+ ${formatCurrency(scorp.additionalFICA)}`} />
+              </>
             )}
             <Text style={s.noteText}>
               The 40% threshold is a common practice guideline. Reasonable compensation is determined
@@ -138,14 +152,20 @@ export function TaxReportDocument({ input, output }: Props) {
               <Row label="State Deduction" value={`− ${formatCurrency(state.stateDeduction)}`} />
               <Row label="Effective State Rate" value={formatPercent(state.effectiveStateRate)} />
               <Row label="State Income Tax (before proration)" value={formatCurrency(state.stateIncomeTax)} />
-              <View style={s.subtotalRow}>
-                <Text style={s.subtotalLabel}>State Owed for {input.quarter}</Text>
-                <Text style={s.subtotalValue}>{formatCurrency(output.totalStateOwed)}</Text>
-              </View>
             </>
           ) : (
             <Row label={`No individual income tax in ${state.stateName}`} value="$0" muted />
           )}
+          {state.exciseTax > 0 && (
+            <Row label="Excise Tax (6.5% on net earnings)" value={formatCurrency(state.exciseTax)} />
+          )}
+          {state.franchiseTax > 0 && (
+            <Row label="Franchise Tax (minimum)" value={formatCurrency(state.franchiseTax)} />
+          )}
+          <View style={s.subtotalRow}>
+            <Text style={s.subtotalLabel}>State Owed for {input.quarter}</Text>
+            <Text style={s.subtotalValue}>{formatCurrency(output.totalStateOwed)}</Text>
+          </View>
           {state.notes.map((note, i) => (
             <Text key={i} style={s.noteText}>• {note}</Text>
           ))}
