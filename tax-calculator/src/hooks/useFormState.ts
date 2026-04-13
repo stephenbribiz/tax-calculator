@@ -14,7 +14,7 @@ const defaultStep2: Step2Data = {
   filingStatus:         'Single',
   ownershipPct:         100,
   numDependentChildren: 0,
-  state:                'TX',
+  state:                'TN',
 }
 
 const defaultStep3: Step3Data = {
