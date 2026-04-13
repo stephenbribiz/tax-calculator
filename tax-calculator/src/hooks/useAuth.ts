@@ -85,16 +85,20 @@ export function useAuth(): AuthState {
 }
 
 async function fetchIsAdmin(userId: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', userId)
-    .single()
-  if (error) {
-    console.warn('Failed to fetch user profile:', error.message)
+  try {
+    const result = await Promise.race([
+      supabase.from('profiles').select('role').eq('id', userId).single(),
+      new Promise<null>(resolve => setTimeout(() => resolve(null), 5000)),
+    ])
+    if (!result || !('data' in result)) return false
+    if (result.error) {
+      console.warn('Failed to fetch user profile:', result.error.message)
+      return false
+    }
+    return result.data?.role === 'admin'
+  } catch {
     return false
   }
-  return data?.role === 'admin'
 }
 
 export async function signIn(email: string, password: string) {
