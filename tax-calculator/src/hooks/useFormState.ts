@@ -5,12 +5,12 @@ const defaultStep1: Step1Data = {
   companyName:   '',
   companyType:   'S-Corp',
   ownerName:     '',
-  taxYear:       new Date().getFullYear(),
-  dateCompleted: new Date().toISOString().split('T')[0],
 }
 
 const defaultStep2: Step2Data = {
   quarter:              'Q1',
+  taxYear:              new Date().getFullYear(),
+  dateCompleted:        new Date().toISOString().split('T')[0],
   filingStatus:         'Single',
   ownershipPct:         100,
   numDependentChildren: 0,

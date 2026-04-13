@@ -5,8 +5,6 @@ import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
 import { COMPANY_TYPE_OPTIONS } from '@/constants/companyTypes'
 
-const YEAR_OPTIONS = [2024, 2025, 2026].map(y => ({ value: String(y), label: String(y) }))
-
 interface Step1Props {
   defaultValues: Step1Data
   onSubmit: (data: Step1Data) => void
@@ -36,20 +34,6 @@ export function Step1ClientInfo({ defaultValues, onSubmit }: Step1Props) {
         error={errors.companyType?.message}
         {...register('companyType', { required: 'Required' })}
       />
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Select
-          label="Tax Year"
-          options={YEAR_OPTIONS}
-          {...register('taxYear', { valueAsNumber: true })}
-        />
-        <Input
-          label="Date Report Completed"
-          type="date"
-          error={errors.dateCompleted?.message}
-          {...register('dateCompleted', { required: 'Required' })}
-        />
-      </div>
 
       <div className="flex justify-end pt-2">
         <Button type="submit">Continue →</Button>

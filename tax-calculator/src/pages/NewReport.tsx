@@ -21,8 +21,8 @@ function toTaxInput(s1: Step1Data, s2: Step2Data, s3: Step3Data): TaxInput {
     companyName:          s1.companyName,
     companyType:          s1.companyType,
     ownerName:            s1.ownerName,
-    taxYear:              s1.taxYear,
-    dateCompleted:        s1.dateCompleted,
+    taxYear:              s2.taxYear,
+    dateCompleted:        s2.dateCompleted,
     quarter:              s2.quarter,
     filingStatus:         s2.filingStatus,
     ownershipPct:         s2.ownershipPct,
@@ -60,7 +60,6 @@ export default function NewReport() {
     clientLoaded.current = true
 
     async function loadClient() {
-      // Fetch client profile
       const { data: client } = await supabase
         .from('clients')
         .select('*')
@@ -81,21 +80,23 @@ export default function NewReport() {
       const doneQuarters = (existingReports ?? []).map(r => r.quarter)
       const nextQuarter = QUARTERS.find(q => !doneQuarters.includes(q)) ?? 'Q1'
 
-      // Pre-populate Step 1 and Step 2 from saved client data
+      // Pre-populate Step 1 from client identity
       dispatch({
         type: 'SET_STEP1',
         payload: {
           companyName:  client.company_name,
           companyType:  client.company_type as CompanyType,
           ownerName:    client.owner_name,
-          taxYear,
-          dateCompleted: new Date().toISOString().split('T')[0],
         },
       })
+
+      // Pre-populate Step 2 with client profile + smart defaults for quarter/year
       dispatch({
         type: 'SET_STEP2',
         payload: {
           quarter:              nextQuarter as Quarter,
+          taxYear,
+          dateCompleted:        new Date().toISOString().split('T')[0],
           filingStatus:         (client.filing_status ?? 'Single') as FilingStatus,
           ownershipPct:         client.ownership_pct ?? 100,
           numDependentChildren: client.num_dependents ?? 0,
@@ -103,8 +104,8 @@ export default function NewReport() {
         },
       })
 
-      // Skip straight to the financial data step
-      dispatch({ type: 'GO_TO_STEP', payload: 3 })
+      // Go to Step 2 so user can confirm/change quarter and year
+      dispatch({ type: 'GO_TO_STEP', payload: 2 })
     }
 
     loadClient()
@@ -169,9 +170,9 @@ export default function NewReport() {
     const { error: reportError } = await supabase.from('reports').insert({
       client_id:       clientData.id,
       created_by:      user.id,
-      tax_year:        state.step1.taxYear,
+      tax_year:        state.step2.taxYear,
       quarter:         state.step2.quarter,
-      date_completed:  state.step1.dateCompleted,
+      date_completed:  state.step2.dateCompleted,
       input_snapshot:  taxInput as unknown as Record<string, unknown>,
       output_snapshot: output as unknown as Record<string, unknown>,
     })
@@ -185,7 +186,7 @@ export default function NewReport() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">New Tax Estimate</h1>
         <p className="text-sm text-slate-500 mt-1">
-          {state.step1.companyName || 'New Client'} {state.step2.quarter && `· ${state.step2.quarter}`}
+          {state.step1.companyName || 'New Client'} {state.step2.quarter && `· ${state.step2.quarter} ${state.step2.taxYear}`}
         </p>
       </div>
 
@@ -217,7 +218,7 @@ export default function NewReport() {
             defaultValues={state.step3}
             companyType={state.step1.companyType}
             filingStatus={state.step2.filingStatus}
-            taxYear={state.step1.taxYear}
+            taxYear={state.step2.taxYear}
             onSubmit={handleStep3}
             onBack={() => dispatch({ type: 'GO_TO_STEP', payload: 2 })}
           />
@@ -238,7 +239,7 @@ export default function NewReport() {
                 <dt className="text-slate-500">Type</dt>
                 <dd className="text-slate-900">{state.step1.companyType}</dd>
                 <dt className="text-slate-500">Quarter / Year</dt>
-                <dd className="text-slate-900">{state.step2.quarter} {state.step1.taxYear}</dd>
+                <dd className="text-slate-900">{state.step2.quarter} {state.step2.taxYear}</dd>
                 <dt className="text-slate-500">State</dt>
                 <dd className="text-slate-900">{state.step2.state}</dd>
                 <dt className="text-slate-500">Filing Status</dt>

@@ -11,6 +11,8 @@ const QUARTER_SELECT_OPTIONS = QUARTER_OPTIONS.map(q => ({
   label: `${q.label} (${q.months})`,
 }))
 
+const YEAR_OPTIONS = [2024, 2025, 2026].map(y => ({ value: String(y), label: String(y) }))
+
 interface Step2Props {
   defaultValues: Step2Data
   onSubmit: (data: Step2Data) => void
@@ -22,25 +24,39 @@ export function Step2TaxProfile({ defaultValues, onSubmit, onBack }: Step2Props)
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Select
           label="Fiscal Quarter"
           options={QUARTER_SELECT_OPTIONS}
           {...register('quarter')}
         />
         <Select
-          label="Filing Status"
-          options={FILING_STATUS_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
-          {...register('filingStatus')}
+          label="Tax Year"
+          options={YEAR_OPTIONS}
+          {...register('taxYear', { valueAsNumber: true })}
+        />
+        <Input
+          label="Date Completed"
+          type="date"
+          error={errors.dateCompleted?.message}
+          {...register('dateCompleted', { required: 'Required' })}
         />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Select
+          label="Filing Status"
+          options={FILING_STATUS_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
+          {...register('filingStatus')}
+        />
+        <Select
           label="State of Residence"
           options={STATE_OPTIONS}
           {...register('state')}
         />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Input
           label="Ownership Percentage (%)"
           type="number"
@@ -55,15 +71,14 @@ export function Step2TaxProfile({ defaultValues, onSubmit, onBack }: Step2Props)
             max: { value: 100, message: 'Cannot exceed 100%' },
           })}
         />
+        <Input
+          label="Number of Dependent Children"
+          type="number"
+          min="0"
+          hint="Qualifying children under age 17 for Child Tax Credit"
+          {...register('numDependentChildren', { valueAsNumber: true, min: 0 })}
+        />
       </div>
-
-      <Input
-        label="Number of Dependent Children"
-        type="number"
-        min="0"
-        hint="Qualifying children under age 17 for Child Tax Credit"
-        {...register('numDependentChildren', { valueAsNumber: true, min: 0 })}
-      />
 
       <div className="flex justify-between pt-2">
         <Button type="button" variant="secondary" onClick={onBack}>← Back</Button>

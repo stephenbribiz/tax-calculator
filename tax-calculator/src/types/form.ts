@@ -4,12 +4,12 @@ export interface Step1Data {
   companyName: string
   companyType: CompanyType
   ownerName: string
-  taxYear: number
-  dateCompleted: string
 }
 
 export interface Step2Data {
   quarter: Quarter
+  taxYear: number
+  dateCompleted: string
   filingStatus: FilingStatus
   ownershipPct: number
   numDependentChildren: number
