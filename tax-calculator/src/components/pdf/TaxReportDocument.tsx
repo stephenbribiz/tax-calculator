@@ -88,7 +88,14 @@ export function TaxReportDocument({ input, output }: Props) {
           {isScorp ? (
             <Row label="FICA Paid via Payroll (est.)" value={`− ${formatCurrency(federal.ficaAlreadyPaid)}`} />
           ) : (
-            <Row label="Self-Employment Tax" value={formatCurrency(federal.seTax)} />
+            <>
+              <Row label="Self-Employment Tax" value={formatCurrency(federal.seTax)} />
+              <Row label="    Social Security (12.4%)" value={formatCurrency(federal.seSocialSecurity)} muted />
+              <Row label="    Medicare (2.9%)" value={formatCurrency(federal.seMedicare)} muted />
+              {federal.seAdditionalMedicare > 0 && (
+                <Row label="    Additional Medicare (0.9%)" value={formatCurrency(federal.seAdditionalMedicare)} muted />
+              )}
+            </>
           )}
           <View style={s.subtotalRow}>
             <Text style={s.subtotalLabel}>Federal Total (before proration)</Text>

@@ -11,6 +11,9 @@ interface FederalCalcInput {
   companyType: CompanyType
   shareholderSalary: number
   seTax: number
+  seSocialSecurity: number
+  seMedicare: number
+  seAdditionalMedicare: number
   numDependentChildren: number
   taxData: FederalTaxData
 }
@@ -53,6 +56,9 @@ export function calculateFederal(input: FederalCalcInput): FederalResult {
     childTaxCredit,
     netIncomeTax,
     seTax,
+    seSocialSecurity: input.seSocialSecurity,
+    seMedicare: input.seMedicare,
+    seAdditionalMedicare: input.seAdditionalMedicare,
     ficaAlreadyPaid,
     totalFederalBeforeProration,
     effectiveFederalRate: effectiveRate,

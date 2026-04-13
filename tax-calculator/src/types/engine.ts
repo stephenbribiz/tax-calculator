@@ -53,6 +53,9 @@ export interface FederalResult {
   childTaxCredit: number
   netIncomeTax: number
   seTax: number
+  seSocialSecurity: number
+  seMedicare: number
+  seAdditionalMedicare: number
   ficaAlreadyPaid: number   // S-Corp payroll FICA already withheld
   totalFederalBeforeProration: number
   effectiveFederalRate: number

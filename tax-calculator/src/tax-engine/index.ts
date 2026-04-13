@@ -79,6 +79,9 @@ export function calculateTax(input: TaxInput): TaxOutput {
     companyType: input.companyType,
     shareholderSalary: input.shareholderSalary,
     seTax: seTaxResult.seTax,
+    seSocialSecurity: seTaxResult.socialSecurity,
+    seMedicare: seTaxResult.medicare,
+    seAdditionalMedicare: seTaxResult.additionalMedicare,
     numDependentChildren: input.numDependentChildren,
     taxData,
   })

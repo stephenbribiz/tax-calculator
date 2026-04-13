@@ -2,6 +2,9 @@ import type { CompanyType } from '@/types'
 import { getTaxDataByYear } from '../constants'
 
 export interface SETaxResult {
+  socialSecurity: number
+  medicare: number
+  additionalMedicare: number
   seTax: number
   deductibleHalf: number
 }
@@ -11,7 +14,7 @@ export interface SETaxResult {
 export function calculateSETax(netSelfEmploymentIncome: number, year: number, companyType: CompanyType): SETaxResult {
   const isScorp = companyType === 'S-Corp'
   if (isScorp || netSelfEmploymentIncome <= 0) {
-    return { seTax: 0, deductibleHalf: 0 }
+    return { socialSecurity: 0, medicare: 0, additionalMedicare: 0, seTax: 0, deductibleHalf: 0 }
   }
 
   const { ssWageBase } = getTaxDataByYear(year)
@@ -31,5 +34,5 @@ export function calculateSETax(netSelfEmploymentIncome: number, year: number, co
   const seTax = ssTax + medicareTax + additionalMedicare
   const deductibleHalf = (ssTax + medicareTax) / 2
 
-  return { seTax, deductibleHalf }
+  return { socialSecurity: ssTax, medicare: medicareTax, additionalMedicare, seTax, deductibleHalf }
 }

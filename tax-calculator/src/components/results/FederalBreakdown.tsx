@@ -35,7 +35,14 @@ export function FederalBreakdown({ input, output }: Props) {
             <Row label="FICA Already Paid via Payroll" value={`− ${formatCurrency(federal.ficaAlreadyPaid)}`} />
           </>
         ) : (
-          <Row label="Self-Employment Tax (15.3%)" value={formatCurrency(federal.seTax)} />
+          <>
+            <Row label="Self-Employment Tax" value={formatCurrency(federal.seTax)} />
+            <Row label="Social Security (12.4%)" value={formatCurrency(federal.seSocialSecurity)} indent />
+            <Row label="Medicare (2.9%)" value={formatCurrency(federal.seMedicare)} indent />
+            {federal.seAdditionalMedicare > 0 && (
+              <Row label="Additional Medicare (0.9%)" value={formatCurrency(federal.seAdditionalMedicare)} indent />
+            )}
+          </>
         )}
 
         <div className="flex justify-between items-center py-2 mt-1">
