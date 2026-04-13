@@ -152,6 +152,7 @@ export function calculateTax(input: TaxInput): TaxOutput {
       year: input.taxYear,
       companyType: input.companyType,
       businessNetIncome: input.businessNetIncome,
+      shareholderSalary: input.shareholderSalary,
     })
     totalStateOwed = annState.stateIncomeTax * proration
 
@@ -164,6 +165,7 @@ export function calculateTax(input: TaxInput): TaxOutput {
       year: input.taxYear,
       companyType: input.companyType,
       businessNetIncome: input.businessNetIncome,
+      shareholderSalary: input.shareholderSalary,
     })
 
     // Add entity-level taxes (excise + franchise) — not prorated, these are annual

@@ -146,6 +146,11 @@ export default function NewReport() {
     dispatch({ type: 'GO_TO_STEP', payload: 'results' })
   }, [dispatch, state.step1, state.step2])
 
+  const handleAdjustedSalaryChange = useCallback((value: number) => {
+    const updated = { ...state.step3, adjustedSalary: value }
+    dispatch({ type: 'SET_STEP3', payload: updated })
+  }, [dispatch, state.step3])
+
   async function handleSave() {
     if (!output || !user) return
     setSaving(true)
@@ -273,7 +278,7 @@ export default function NewReport() {
 
           {/* Right: results */}
           <div>
-            <ResultsPanel input={taxInput} output={output} />
+            <ResultsPanel input={taxInput} output={output} onAdjustedSalaryChange={handleAdjustedSalaryChange} />
           </div>
         </div>
       )}

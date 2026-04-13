@@ -61,15 +61,7 @@ export function Step3FinancialData({
                   onChange={field.onChange}
                 />
               )} />
-              <Controller name="adjustedSalary" control={control} render={({ field }) => (
-                <CurrencyInput
-                  label="Adjusted Salary for Reasonable Comp (YTD)"
-                  hint="Optional: enter a target cumulative salary to see additional FICA impact. Leave at 0 for no adjustment."
-                  value={field.value}
-                  onChange={field.onChange}
-                />
-              )} />
-              <Controller name="federalWithholding" control={control} render={({ field }) => (
+<Controller name="federalWithholding" control={control} render={({ field }) => (
                 <CurrencyInput
                   label="Federal Income Tax Withheld (YTD)"
                   hint="Cumulative federal income tax withheld from shareholder payroll through this quarter."

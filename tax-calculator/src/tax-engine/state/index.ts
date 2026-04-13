@@ -16,13 +16,14 @@ export interface StateCalcInput {
   year: number
   companyType?: CompanyType
   businessNetIncome?: number
+  shareholderSalary?: number
 }
 
 export function calculateStateTax(input: StateCalcInput): StateResult {
   const { state, allocatedBusinessIncome, taxableIncome, filingStatus, year, companyType, businessNetIncome } = input
 
   switch (state) {
-    case 'TN': return calculateTN(allocatedBusinessIncome, taxableIncome, filingStatus, year, companyType, businessNetIncome)
+    case 'TN': return calculateTN(allocatedBusinessIncome, taxableIncome, filingStatus, year, companyType, businessNetIncome, input.shareholderSalary)
     case 'CA': return calculateCA(allocatedBusinessIncome, taxableIncome, filingStatus, year)
     case 'GA': return calculateGA(allocatedBusinessIncome, taxableIncome, filingStatus, year)
     case 'NC': return calculateNC(allocatedBusinessIncome, taxableIncome, filingStatus, year)

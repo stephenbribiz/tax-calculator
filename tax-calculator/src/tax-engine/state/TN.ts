@@ -2,25 +2,30 @@ import type { StateResult, FilingStatus, CompanyType } from '@/types'
 
 // Tennessee has no individual income tax (Hall Tax fully repealed Jan 1, 2021).
 // Business-level taxes apply to S-Corps, LLCs, and Partnerships:
-//   - Excise Tax: 6.5% on net earnings
+//   - Excise Tax: 6.5% on net earnings AFTER shareholder wages
 //   - Franchise Tax: 0.25% on net worth or book value of real/tangible property in TN (min $100)
 // These are entity-level obligations but are real costs the business owner pays.
 
 export function calculateTN(
-  allocatedBusinessIncome: number,
+  _allocatedBusinessIncome: number,
   _taxableIncome: number,
   _filingStatus: FilingStatus,
   _year: number,
   companyType?: CompanyType,
   businessNetIncome?: number,
+  shareholderSalary?: number,
 ): StateResult {
-  const fullBusinessIncome = businessNetIncome ?? allocatedBusinessIncome
+  const fullBusinessIncome = businessNetIncome ?? 0
+  const salary = shareholderSalary ?? 0
 
   // Calculate excise tax for entity types subject to it
   const entitySubjectToExcise = companyType === 'S-Corp' || companyType === 'LLC'
     || companyType === 'Partnership' || companyType === 'Single-Member-LLC'
-  const exciseTax = entitySubjectToExcise && fullBusinessIncome > 0
-    ? fullBusinessIncome * 0.065
+
+  // Excise tax is on net earnings AFTER shareholder wages (wages are a deductible expense)
+  const netEarningsAfterWages = Math.max(0, fullBusinessIncome - salary)
+  const exciseTax = entitySubjectToExcise && netEarningsAfterWages > 0
+    ? netEarningsAfterWages * 0.065
     : 0
 
   // Franchise tax requires net worth (we don't have it) — show minimum as estimate
@@ -31,7 +36,11 @@ export function calculateTN(
   ]
 
   if (entitySubjectToExcise) {
-    notes.push(`Excise Tax: 6.5% on net earnings = estimated at entity level.`)
+    if (salary > 0) {
+      notes.push(`Excise Tax: 6.5% on net earnings after shareholder wages ($${netEarningsAfterWages.toLocaleString()}).`)
+    } else {
+      notes.push(`Excise Tax: 6.5% on net earnings.`)
+    }
     notes.push(`Franchise Tax: 0.25% on net worth (minimum $100/year). Using minimum — actual depends on entity net worth.`)
     notes.push('These entity-level taxes are filed with the business return.')
   }

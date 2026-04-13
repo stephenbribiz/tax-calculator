@@ -24,7 +24,7 @@ export function analyzeReasonableComp(
   const recommendedFICA = recommendedFICAResult.totalFICA
   const adjustedFICA    = adjustedFICAResult.totalFICA
   const ficaGap         = Math.max(0, recommendedFICA - currentFICA)
-  const additionalFICA  = Math.max(0, adjustedFICA - currentFICA)
+  const additionalFICA  = effectiveAdjustedSalary !== 0 ? adjustedFICA - currentFICA : 0
 
   let warningMessage: string | null = null
   if (!isSalaryReasonable) {

@@ -107,6 +107,10 @@ export default function QuickCalculator() {
     setStep('results')
   }, [profile])
 
+  const handleAdjustedSalaryChange = useCallback((value: number) => {
+    setFinancials(prev => ({ ...prev, adjustedSalary: value }))
+  }, [])
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="mb-6">
@@ -227,7 +231,7 @@ export default function QuickCalculator() {
           </div>
 
           <div>
-            <ResultsPanel input={taxInput} output={output} />
+            <ResultsPanel input={taxInput} output={output} onAdjustedSalaryChange={handleAdjustedSalaryChange} />
           </div>
         </div>
       )}
