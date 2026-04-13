@@ -37,11 +37,15 @@ export function useAuth(): AuthState {
 }
 
 async function fetchIsAdmin(userId: string): Promise<boolean> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', userId)
     .single()
+  if (error) {
+    console.warn('Failed to fetch user profile:', error.message)
+    return false
+  }
   return data?.role === 'admin'
 }
 
