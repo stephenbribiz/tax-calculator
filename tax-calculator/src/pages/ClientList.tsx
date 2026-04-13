@@ -9,8 +9,8 @@ export default function ClientList() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Clients</h1>
-        <Link to="/reports/new">
-          <Button size="sm">+ New Estimate</Button>
+        <Link to="/clients/new">
+          <Button size="sm">+ New Client</Button>
         </Link>
       </div>
 
@@ -33,7 +33,7 @@ export default function ClientList() {
                   ? (
                     <tr>
                       <td colSpan={5} className="text-center text-slate-400 py-8">
-                        No clients yet. <Link to="/reports/new" className="text-blue-600 hover:underline">Create your first estimate →</Link>
+                        No clients yet. <Link to="/clients/new" className="text-blue-600 hover:underline">Add your first client →</Link>
                       </td>
                     </tr>
                   )

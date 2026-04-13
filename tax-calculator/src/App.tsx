@@ -7,6 +7,8 @@ import NewReport from '@/pages/NewReport'
 import ReportView from '@/pages/ReportView'
 import ClientList from '@/pages/ClientList'
 import ClientDetail from '@/pages/ClientDetail'
+import NewClient from '@/pages/NewClient'
+import QuickCalculator from '@/pages/QuickCalculator'
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -49,7 +51,9 @@ export default function App() {
         <Route path="/reports/new" element={<AuthGuard><NewReport /></AuthGuard>} />
         <Route path="/reports/:id" element={<AuthGuard><ReportView /></AuthGuard>} />
         <Route path="/clients" element={<AuthGuard><ClientList /></AuthGuard>} />
+        <Route path="/clients/new" element={<AuthGuard><NewClient /></AuthGuard>} />
         <Route path="/clients/:id" element={<AuthGuard><ClientDetail /></AuthGuard>} />
+        <Route path="/calculator" element={<AuthGuard><QuickCalculator /></AuthGuard>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

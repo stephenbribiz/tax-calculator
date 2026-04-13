@@ -19,9 +19,14 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
           <p className="text-sm text-slate-500 mt-1">Quarterly tax estimates</p>
         </div>
-        <Link to="/reports/new">
-          <Button>+ New Estimate</Button>
-        </Link>
+        <div className="flex gap-3">
+          <Link to="/clients/new">
+            <Button>+ New Client</Button>
+          </Link>
+          <Link to="/calculator">
+            <Button variant="secondary">Quick Calculator</Button>
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
