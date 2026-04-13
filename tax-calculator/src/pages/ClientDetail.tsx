@@ -33,13 +33,13 @@ export default function ClientDetail() {
           <p className="text-sm text-slate-500">{client.company_name} · {client.company_type} · {client.state}</p>
         </div>
         <Link to={`/reports/new?client=${client.id}`}>
-          <Button size="sm">+ New Estimate</Button>
+          <Button size="sm">+ New Tax Plan</Button>
         </Link>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="bg-slate-50 px-5 py-3 border-b border-slate-200">
-          <h2 className="text-sm font-semibold text-slate-700">All Reports</h2>
+          <h2 className="text-sm font-semibold text-slate-700">Tax Plans</h2>
         </div>
         {loading
           ? <p className="text-sm text-slate-400 px-5 py-6">Loading…</p>
@@ -60,7 +60,7 @@ export default function ClientDetail() {
                   ? (
                     <tr>
                       <td colSpan={6} className="text-center text-slate-400 py-8">
-                        No reports for this client yet.
+                        No tax plans for this client yet.
                       </td>
                     </tr>
                   )
@@ -86,10 +86,16 @@ export default function ClientDetail() {
                         <td className="px-5 py-3 text-right text-slate-400 text-xs">
                           {report.date_completed ? formatDate(report.date_completed) : '—'}
                         </td>
-                        <td className="px-5 py-3 text-right">
+                        <td className="px-5 py-3 text-right space-x-3">
+                          <Link
+                            to={`/reports/new?edit=${report.id}`}
+                            className="text-xs text-blue-500 hover:text-blue-700"
+                          >
+                            Edit
+                          </Link>
                           <button
                             onClick={async () => {
-                              if (confirm('Delete this report?')) await deleteReport(report.id)
+                              if (confirm('Delete this tax plan?')) await deleteReport(report.id)
                             }}
                             className="text-xs text-red-400 hover:text-red-600"
                           >

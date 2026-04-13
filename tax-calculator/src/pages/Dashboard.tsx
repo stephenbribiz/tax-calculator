@@ -37,7 +37,7 @@ export default function Dashboard() {
           </p>
         </Card>
         <Card>
-          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Total Reports</p>
+          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Tax Plans</p>
           <p className="text-3xl font-bold text-slate-900">
             {reportsLoading ? '—' : reports.length}
           </p>
@@ -77,7 +77,7 @@ export default function Dashboard() {
         {/* Recent reports */}
         <div className="lg:col-span-2">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-slate-700">Recent Reports</h2>
+            <h2 className="text-sm font-semibold text-slate-700">Recent Tax Plans</h2>
           </div>
           {reportsLoading
             ? <p className="text-sm text-slate-400">Loading…</p>
@@ -97,7 +97,7 @@ export default function Dashboard() {
                       ? (
                         <tr>
                           <td colSpan={4} className="text-center text-slate-400 py-8">
-                            No reports yet. <Link to="/reports/new" className="text-blue-600 hover:underline">Create your first estimate →</Link>
+                            No tax plans yet. <Link to="/reports/new" className="text-blue-600 hover:underline">Create your first tax plan →</Link>
                           </td>
                         </tr>
                       )

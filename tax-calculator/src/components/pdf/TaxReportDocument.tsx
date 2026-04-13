@@ -26,13 +26,13 @@ export function TaxReportDocument({ input, output }: Props) {
     : undefined
 
   return (
-    <Document title={`Tax Estimate — ${input.ownerName} ${input.quarter} ${input.taxYear}`}>
+    <Document title={`Tax Plan — ${input.ownerName} ${input.quarter} ${input.taxYear}`}>
       <Page size="LETTER" style={s.page}>
 
         {/* Header */}
         <View style={s.headerRow}>
           <View style={s.headerLeft}>
-            <Text style={s.reportTitle}>Quarterly Tax Estimate</Text>
+            <Text style={s.reportTitle}>Quarterly Tax Plan</Text>
             <Text style={s.reportSubtitle}>{periodLabel}</Text>
             <Text style={s.reportSubtitle}>Completed: {formatDate(input.dateCompleted)}</Text>
           </View>

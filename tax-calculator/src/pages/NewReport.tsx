@@ -42,6 +42,39 @@ function toTaxInput(s1: Step1Data, s2: Step2Data, s3: Step3Data): TaxInput {
   }
 }
 
+// Reverse: convert a saved TaxInput back into form steps
+function fromTaxInput(input: TaxInput): { step1: Step1Data; step2: Step2Data; step3: Step3Data } {
+  return {
+    step1: {
+      companyName: input.companyName,
+      companyType: input.companyType,
+      ownerName:   input.ownerName,
+    },
+    step2: {
+      quarter:              input.quarter,
+      taxYear:              input.taxYear,
+      dateCompleted:        input.dateCompleted,
+      filingStatus:         input.filingStatus,
+      ownershipPct:         input.ownershipPct,
+      numDependentChildren: input.numDependentChildren,
+      state:                input.state,
+    },
+    step3: {
+      businessNetIncome:  input.businessNetIncome,
+      shareholderSalary:  input.shareholderSalary,
+      adjustedSalary:     input.adjustedSalary ?? 0,
+      federalWithholding: input.federalWithholding ?? 0,
+      mealExpense:        input.mealExpense,
+      shareholderDraw:    input.shareholderDraw,
+      otherIncome:        input.otherIncome,
+      spousalIncome:      input.spousalIncome,
+      priorEstimatesPaid: input.priorEstimatesPaid,
+      deductionOverride:  input.deductionOverride,
+      annualizeIncome:    input.annualizeIncome,
+    },
+  }
+}
+
 const QUARTERS: Quarter[] = ['Q1', 'Q2', 'Q3', 'Q4']
 
 export default function NewReport() {
@@ -54,11 +87,47 @@ export default function NewReport() {
   const [output, setOutput] = useState<TaxOutput | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const clientLoaded = useRef(false)
+  const reportLoaded = useRef(false)
 
-  // Load client data when ?client=<id> is present
+  // The ID of the report being edited (null = new report)
+  const editReportId = searchParams.get('edit')
+  const [editClientId, setEditClientId] = useState<string | null>(null)
+  const isEditing = !!editReportId
+
+  // Load existing report for editing when ?edit=<id> is present
+  useEffect(() => {
+    if (!editReportId || reportLoaded.current) return
+    reportLoaded.current = true
+
+    async function loadReport() {
+      const { data } = await supabase
+        .from('reports')
+        .select('*, clients(id)')
+        .eq('id', editReportId)
+        .single()
+
+      if (!data) return
+
+      const input = data.input_snapshot as unknown as TaxInput
+      const { step1, step2, step3 } = fromTaxInput(input)
+
+      setEditClientId(data.client_id)
+
+      dispatch({ type: 'SET_STEP1', payload: step1 })
+      dispatch({ type: 'SET_STEP2', payload: step2 })
+      dispatch({ type: 'SET_STEP3', payload: step3 })
+
+      // Go straight to step 3 (financials) for editing
+      dispatch({ type: 'GO_TO_STEP', payload: 3 })
+    }
+
+    loadReport()
+  }, [editReportId, dispatch])
+
+  // Load client data when ?client=<id> is present (new report for existing client)
   useEffect(() => {
     const id = searchParams.get('client')
-    if (!id || clientLoaded.current) return
+    if (!id || clientLoaded.current || isEditing) return
     clientLoaded.current = true
 
     async function loadClient() {
@@ -111,7 +180,7 @@ export default function NewReport() {
     }
 
     loadClient()
-  }, [searchParams, dispatch])
+  }, [searchParams, dispatch, isEditing])
 
   // Live calculation — debounced 300ms
   const taxInput = useMemo(() => toTaxInput(state.step1, state.step2, state.step3), [state.step1, state.step2, state.step3])
@@ -156,42 +225,79 @@ export default function NewReport() {
     setSaving(true)
     setSaveError(null)
 
-    // Upsert client
-    const { data: clientData, error: clientError } = await supabase
-      .from('clients')
-      .upsert({
-        company_name:   state.step1.companyName,
-        company_type:   state.step1.companyType,
-        owner_name:     state.step1.ownerName,
-        state:          state.step2.state,
-        filing_status:  state.step2.filingStatus,
-        ownership_pct:  state.step2.ownershipPct,
-        num_dependents: state.step2.numDependentChildren,
-        created_by:     user.id,
-      }, { onConflict: 'company_name,created_by' })
-      .select('id')
-      .single()
+    if (isEditing && editReportId) {
+      // ── UPDATE existing report ──
+      const { error: reportError } = await supabase
+        .from('reports')
+        .update({
+          tax_year:        state.step2.taxYear,
+          quarter:         state.step2.quarter,
+          date_completed:  state.step2.dateCompleted,
+          input_snapshot:  taxInput as unknown as Record<string, unknown>,
+          output_snapshot: output as unknown as Record<string, unknown>,
+        })
+        .eq('id', editReportId)
 
-    if (clientError) { setSaveError(clientError.message); setSaving(false); return }
+      if (reportError) { setSaveError(reportError.message); setSaving(false); return }
 
-    const { error: reportError } = await supabase.from('reports').insert({
-      client_id:       clientData.id,
-      created_by:      user.id,
-      tax_year:        state.step2.taxYear,
-      quarter:         state.step2.quarter,
-      date_completed:  state.step2.dateCompleted,
-      input_snapshot:  taxInput as unknown as Record<string, unknown>,
-      output_snapshot: output as unknown as Record<string, unknown>,
-    })
+      // Also update the client profile in case any info changed
+      if (editClientId) {
+        await supabase
+          .from('clients')
+          .update({
+            company_name:   state.step1.companyName,
+            company_type:   state.step1.companyType,
+            owner_name:     state.step1.ownerName,
+            state:          state.step2.state,
+            filing_status:  state.step2.filingStatus,
+            ownership_pct:  state.step2.ownershipPct,
+            num_dependents: state.step2.numDependentChildren,
+          })
+          .eq('id', editClientId)
+      }
 
-    if (reportError) { setSaveError(reportError.message); setSaving(false); return }
-    navigate(clientData.id ? `/clients/${clientData.id}` : '/')
+      navigate(editClientId ? `/clients/${editClientId}` : `/reports/${editReportId}`)
+    } else {
+      // ── CREATE new report ──
+      // Upsert client
+      const { data: clientData, error: clientError } = await supabase
+        .from('clients')
+        .upsert({
+          company_name:   state.step1.companyName,
+          company_type:   state.step1.companyType,
+          owner_name:     state.step1.ownerName,
+          state:          state.step2.state,
+          filing_status:  state.step2.filingStatus,
+          ownership_pct:  state.step2.ownershipPct,
+          num_dependents: state.step2.numDependentChildren,
+          created_by:     user.id,
+        }, { onConflict: 'company_name,created_by' })
+        .select('id')
+        .single()
+
+      if (clientError) { setSaveError(clientError.message); setSaving(false); return }
+
+      const { error: reportError } = await supabase.from('reports').insert({
+        client_id:       clientData.id,
+        created_by:      user.id,
+        tax_year:        state.step2.taxYear,
+        quarter:         state.step2.quarter,
+        date_completed:  state.step2.dateCompleted,
+        input_snapshot:  taxInput as unknown as Record<string, unknown>,
+        output_snapshot: output as unknown as Record<string, unknown>,
+      })
+
+      if (reportError) { setSaveError(reportError.message); setSaving(false); return }
+      navigate(clientData.id ? `/clients/${clientData.id}` : '/')
+    }
   }
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">New Tax Estimate</h1>
+        <h1 className="text-2xl font-bold text-slate-900">
+          {isEditing ? 'Edit Tax Plan' : 'New Tax Plan'}
+        </h1>
         <p className="text-sm text-slate-500 mt-1">
           {state.step1.companyName || 'New Client'} {state.step2.quarter && `· ${state.step2.quarter} ${state.step2.taxYear}`}
         </p>
@@ -237,7 +343,7 @@ export default function NewReport() {
           {/* Left: form summary + actions */}
           <div className="space-y-4">
             <div className="bg-slate-50 rounded-xl border border-slate-200 p-5">
-              <h2 className="text-sm font-semibold text-slate-700 mb-3">Report Details</h2>
+              <h2 className="text-sm font-semibold text-slate-700 mb-3">Tax Plan Details</h2>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                 <dt className="text-slate-500">Client</dt>
                 <dd className="text-slate-900 font-medium">{state.step1.ownerName}</dd>
@@ -265,7 +371,7 @@ export default function NewReport() {
                 <PDFDownloadButton input={taxInput} output={output} />
               </Suspense>
               <Button onClick={handleSave} loading={saving}>
-                Save Report
+                {isEditing ? 'Update Tax Plan' : 'Save Tax Plan'}
               </Button>
             </div>
 

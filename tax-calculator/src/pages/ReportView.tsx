@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import { getReport } from '@/hooks/useReports'
 import type { TaxInput, TaxOutput } from '@/types'
 import { ResultsPanel } from '@/components/results/ResultsPanel'
@@ -12,8 +12,10 @@ import { formatDate } from '@/lib/utils'
 
 export default function ReportView() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const [input, setInput]   = useState<TaxInput | null>(null)
   const [output, setOutput] = useState<TaxOutput | null>(null)
+  const [clientId, setClientId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]   = useState<string | null>(null)
 
@@ -24,6 +26,7 @@ export default function ReportView() {
       if (data) {
         setInput(data.input_snapshot as unknown as TaxInput)
         setOutput(data.output_snapshot as unknown as TaxOutput)
+        setClientId(data.client_id)
       }
       setLoading(false)
     })
@@ -32,7 +35,7 @@ export default function ReportView() {
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <p className="text-slate-400">Loading report…</p>
+        <p className="text-slate-400">Loading tax plan…</p>
       </div>
     )
   }
@@ -40,7 +43,7 @@ export default function ReportView() {
   if (error || !input || !output) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <p className="text-red-500">{error || 'Report not found.'}</p>
+        <p className="text-red-500">{error || 'Tax plan not found.'}</p>
         <Link to="/" className="text-sm text-blue-600 hover:underline mt-2 block">← Back to Dashboard</Link>
       </div>
     )
@@ -53,20 +56,32 @@ export default function ReportView() {
           <div className="flex items-center gap-2 mb-1">
             <Link to="/" className="text-sm text-slate-400 hover:text-slate-600">Dashboard</Link>
             <span className="text-slate-300">/</span>
-            <span className="text-sm text-slate-600">{input.ownerName}</span>
-            <span className="text-slate-300">/</span>
+            {clientId && (
+              <>
+                <Link to={`/clients/${clientId}`} className="text-sm text-slate-400 hover:text-slate-600">{input.ownerName}</Link>
+                <span className="text-slate-300">/</span>
+              </>
+            )}
             <span className="text-sm text-slate-600">{input.quarter} {input.taxYear}</span>
           </div>
           <h1 className="text-2xl font-bold text-slate-900">
-            {input.ownerName} — {input.quarter} {input.taxYear}
+            {input.ownerName} — {input.quarter} {input.taxYear} Tax Plan
           </h1>
           <p className="text-sm text-slate-500">
             {input.companyName} · {input.companyType} · Completed {formatDate(input.dateCompleted)}
           </p>
         </div>
-        <Suspense fallback={<Button variant="secondary" disabled>↓ PDF</Button>}>
-          <PDFDownloadButton input={input} output={output} />
-        </Suspense>
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => navigate(`/reports/new?edit=${id}`)}
+          >
+            Edit
+          </Button>
+          <Suspense fallback={<Button variant="secondary" disabled>↓ PDF</Button>}>
+            <PDFDownloadButton input={input} output={output} />
+          </Suspense>
+        </div>
       </div>
 
       <ResultsPanel input={input} output={output} />
