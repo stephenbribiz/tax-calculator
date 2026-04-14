@@ -318,7 +318,7 @@ function DocumentsPanel({ clientId }: { clientId: string }) {
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { clients, refetch: refreshClients, deleteClient } = useClients()
+  const { clients, refetch: refreshClients } = useClients()
   const { reports, loading, deleteReport } = useReports(id)
   const { toast } = useToast()
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
@@ -413,17 +413,9 @@ export default function ClientDetail() {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setConfirmDeleteClient(true)}
-            className="text-xs text-red-400 hover:text-red-600 font-medium"
-          >
-            Delete Client
-          </button>
-          <Link to={`/reports/new?client=${client.id}`}>
-            <Button size="sm">+ New Tax Plan</Button>
-          </Link>
-        </div>
+        <Link to={`/reports/new?client=${client.id}`}>
+          <Button size="sm">+ New Tax Plan</Button>
+        </Link>
       </div>
 
       {!loading && reports.length > 0 && (
@@ -596,6 +588,19 @@ export default function ClientDetail() {
         }}
       />
 
+      <div className="mt-10 border border-red-200 rounded-xl p-5 bg-red-50">
+        <h3 className="text-sm font-semibold text-red-700 mb-1">Danger Zone</h3>
+        <p className="text-xs text-red-500 mb-3">
+          Deleting this client permanently removes their profile and all associated tax plans. This cannot be undone.
+        </p>
+        <button
+          onClick={() => setConfirmDeleteClient(true)}
+          className="text-sm font-medium text-white bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition-colors"
+        >
+          Delete Client
+        </button>
+      </div>
+
       <ConfirmModal
         open={confirmDeleteClient}
         title="Delete Client"
@@ -604,10 +609,9 @@ export default function ClientDetail() {
         variant="danger"
         onCancel={() => setConfirmDeleteClient(false)}
         onConfirm={async () => {
-          const error = await deleteClient(client.id)
+          const { error } = await supabase.from('clients').delete().eq('id', client.id)
           if (error) {
-            toast('Failed to delete client', 'error')
-            setConfirmDeleteClient(false)
+            toast('Failed to delete client: ' + error.message, 'error')
           } else {
             toast(`${client.owner_name} deleted`)
             navigate('/clients')
