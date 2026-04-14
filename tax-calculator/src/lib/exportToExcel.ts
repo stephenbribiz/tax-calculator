@@ -591,12 +591,11 @@ function buildSummarySheet(
 
   function row(
     label: string,
-    key: string | null,
+    _key: string | null,
     val: ExcelJS.CellValue,
     styleFn: (row: ExcelJS.Row) => void,
     fmt?: string,
   ) {
-    if (key) R2[key] = r
     const ro = ws.getRow(r++)
     ro.getCell(1).value = label
     ro.getCell(2).value = val

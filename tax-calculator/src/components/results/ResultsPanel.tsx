@@ -13,7 +13,7 @@ interface Props {
 
 export function ResultsPanel({ input, output, onAdjustedSalaryChange }: Props) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <TaxSummary input={input} output={output} />
       <IncomeSummary input={input} output={output} />
       <FederalBreakdown input={input} output={output} />
