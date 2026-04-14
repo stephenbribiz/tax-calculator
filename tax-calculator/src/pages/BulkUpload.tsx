@@ -297,6 +297,7 @@ export default function BulkUpload() {
   const readyCount = files.filter(f => f.status === 'matched' || f.status === 'assigned').length
   const needsAttention = files.filter(f => f.status === 'new_client' || f.status === 'unmatched').length
   const parsingCount = files.filter(f => f.status === 'parsing').length
+  const clientsWithCodes = clients.filter(c => c.client_code).length
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -352,6 +353,22 @@ export default function BulkUpload() {
           )}
         </div>
       </div>
+
+      {/* Warning: no client codes configured */}
+      {phase === 'drop' && clients.length > 0 && clientsWithCodes === 0 && (
+        <div className="mb-4 flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm">
+          <svg className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <div>
+            <p className="font-medium text-amber-800">No client codes configured</p>
+            <p className="text-amber-700 mt-0.5">
+              Files are matched to clients by the prefix in the filename (e.g., <span className="font-mono font-bold">GBG</span> in "GBG 03-2026 Report.pdf").
+              Go to each <Link to="/clients" className="underline hover:text-amber-900">client profile</Link> and set their client code so files are matched automatically.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Drop zone */}
       {(phase === 'drop' || phase === 'review') && (
@@ -409,52 +426,63 @@ export default function BulkUpload() {
 
                   {f.status === 'new_client' && (
                     <>
-                      <Badge variant="warning">New Code</Badge>
-                      <button
-                        onClick={() => setNewClientCode(f.clientCode)}
-                        className="text-xs text-orange-600 hover:text-orange-800 font-medium underline"
-                      >
-                        Create Client
-                      </button>
-                      <span className="text-slate-300">|</span>
-                      <select
-                        className="text-xs border border-slate-300 rounded px-2 py-1"
-                        defaultValue=""
-                        onChange={e => { if (e.target.value) assignClient(f.id, e.target.value) }}
-                      >
-                        <option value="" disabled>Assign existing...</option>
-                        {clients.map(c => (
-                          <option key={c.id} value={c.id}>{c.company_name}</option>
-                        ))}
-                      </select>
-                      <button
-                        onClick={() => skipFile(f.id)}
-                        className="text-xs text-slate-400 hover:text-slate-600"
-                      >
-                        Skip
-                      </button>
+                      <div className="flex flex-col items-end gap-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-500">Code <span className="font-mono font-bold text-slate-700">{f.clientCode}</span> not found —</span>
+                          <button
+                            onClick={() => setNewClientCode(f.clientCode)}
+                            className="text-xs bg-orange-600 hover:bg-orange-700 text-white font-medium px-2.5 py-1 rounded"
+                          >
+                            Set up new client
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-400">or assign to:</span>
+                          <select
+                            className="text-xs border border-slate-300 rounded px-2 py-1"
+                            defaultValue=""
+                            onChange={e => { if (e.target.value) assignClient(f.id, e.target.value) }}
+                          >
+                            <option value="" disabled>existing client...</option>
+                            {clients.map(c => (
+                              <option key={c.id} value={c.id}>{c.company_name}</option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => skipFile(f.id)}
+                            className="text-xs text-slate-400 hover:text-slate-600"
+                          >
+                            Skip
+                          </button>
+                        </div>
+                      </div>
                     </>
                   )}
 
                   {f.status === 'unmatched' && (
                     <>
-                      <Badge variant="neutral">No Code</Badge>
-                      <select
-                        className="text-xs border border-slate-300 rounded px-2 py-1"
-                        defaultValue=""
-                        onChange={e => { if (e.target.value) assignClient(f.id, e.target.value) }}
-                      >
-                        <option value="" disabled>Assign to client...</option>
-                        {clients.map(c => (
-                          <option key={c.id} value={c.id}>{c.company_name}</option>
-                        ))}
-                      </select>
-                      <button
-                        onClick={() => skipFile(f.id)}
-                        className="text-xs text-slate-400 hover:text-slate-600"
-                      >
-                        Skip
-                      </button>
+                      <div className="flex flex-col items-end gap-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-400">No code in filename — assign to:</span>
+                          <select
+                            className="text-xs border border-slate-300 rounded px-2 py-1"
+                            defaultValue=""
+                            onChange={e => { if (e.target.value) assignClient(f.id, e.target.value) }}
+                          >
+                            <option value="" disabled>Select client...</option>
+                            {clients.map(c => (
+                              <option key={c.id} value={c.id}>{c.company_name}</option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => skipFile(f.id)}
+                            className="text-xs text-slate-400 hover:text-slate-600"
+                          >
+                            Skip
+                          </button>
+                        </div>
+                        <p className="text-xs text-slate-400">Rename file to start with the client code to auto-match next time</p>
+                      </div>
                     </>
                   )}
 

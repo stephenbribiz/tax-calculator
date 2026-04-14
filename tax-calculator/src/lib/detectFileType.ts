@@ -32,12 +32,17 @@ export function detectDocumentType(text: string): 'pl' | 'adp_payroll' | 'unknow
 }
 
 /**
- * Extract a 2–4 character client code from the beginning of a filename.
- * Expected format: "GBG 03-2026 Monthly Report.pdf" → "GBG"
+ * Extract a 2–6 character client code from the beginning of a filename.
+ * Handles formats like:
+ *   "GBG 03-2026 Monthly Report.pdf"  → "GBG"
+ *   "GBG_03-2026_Monthly_Report.pdf"  → "GBG"
+ *   "GBG-03-2026.pdf"                 → "GBG"
+ *   "GBGCO 03-2026.pdf"               → "GBGCO"
  */
 export function extractClientCode(filename: string): string | null {
   // Remove file extension first
   const name = filename.replace(/\.[^.]+$/, '')
-  const match = name.match(/^([A-Za-z]{2,4})\s/)
+  // Match 2–6 alpha chars at start, followed by space, underscore, hyphen, or digit
+  const match = name.match(/^([A-Za-z]{2,6})[\s_\-\d]/)
   return match ? match[1].toUpperCase() : null
 }

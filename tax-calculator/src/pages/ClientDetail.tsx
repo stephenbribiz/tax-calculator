@@ -605,17 +605,10 @@ export default function ClientDetail() {
         variant="danger"
         onCancel={() => setConfirmDeleteClient(false)}
         onConfirm={async () => {
-          const { data, error } = await supabase
-            .from('clients')
-            .delete()
-            .eq('id', client.id)
-            .select('id')
+          const { error } = await supabase.rpc('delete_own_client', { client_id: client.id })
           if (error) {
             console.error('Delete client error:', error)
             toast('Error: ' + error.message, 'error')
-          } else if (!data || data.length === 0) {
-            console.error('Delete client: 0 rows affected', client.id)
-            toast('Delete failed — permission denied', 'error')
           } else {
             navigate('/clients')
             toast(`${client.owner_name} deleted`)
