@@ -1,19 +1,24 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useReports } from '@/hooks/useReports'
 import { useClients } from '@/hooks/useClients'
 import { useDocuments } from '@/hooks/useDocuments'
+import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
-import { getDocumentUrl } from '@/lib/storage'
+import { getDocumentUrl, uploadDocument } from '@/lib/storage'
+import { detectDocumentType } from '@/lib/detectFileType'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { DropZone } from '@/components/upload/DropZone'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { TaxOutput, TaxInput } from '@/types'
 import type { DbReport } from '@/lib/supabase'
+import type { PLExtractedData } from '@/lib/parsePL'
+import type { ADPExtractedData } from '@/lib/parseADP'
 
 function ClientTaxSummary({ reports: allReports }: { reports: DbReport[] }) {
   const currentYear = new Date().getFullYear()
@@ -227,11 +232,14 @@ function QuarterComparison({ reports: allReports }: { reports: DbReport[] }) {
   )
 }
 
-function DocumentsPanel({ clientId }: { clientId: string }) {
-  const { documents, loading, deleteDocument } = useDocuments(clientId)
+function DocumentsPanel({ clientId, taxYear }: { clientId: string; taxYear: number }) {
+  const { user } = useAuth()
+  const { documents, loading, deleteDocument, refetch: refetchDocs } = useDocuments(clientId)
   const { toast } = useToast()
   const [expanded, setExpanded] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; path: string; name: string } | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadResults, setUploadResults] = useState<{ name: string; type: string; status: string }[]>([])
 
   async function handleView(storagePath: string) {
     try {
@@ -242,7 +250,82 @@ function DocumentsPanel({ clientId }: { clientId: string }) {
     }
   }
 
-  if (loading || documents.length === 0) return null
+  const handleFiles = useCallback(async (files: File[]) => {
+    if (!user) return
+    setUploading(true)
+    setUploadResults([])
+    const results: { name: string; type: string; status: string }[] = []
+
+    for (const file of files) {
+      try {
+        // Extract text and detect type (same logic as bulk upload)
+        const { extractTextFromPDF } = await import('@/lib/pdfUtils')
+        const rawText = await extractTextFromPDF(file)
+        let fileType = detectDocumentType(rawText)
+
+        // Parse the document
+        let parsedData: PLExtractedData | ADPExtractedData | null = null
+        if (fileType === 'pl') {
+          const { parsePLFromPDF } = await import('@/lib/parsePL')
+          parsedData = await parsePLFromPDF(file)
+        } else if (fileType === 'adp_payroll') {
+          const { parseADPFromPDF } = await import('@/lib/parseADP')
+          parsedData = await parseADPFromPDF(file)
+        } else {
+          // Unknown — try ADP first, fall back to P&L
+          const { parseADPFromPDF } = await import('@/lib/parseADP')
+          const adpResult = await parseADPFromPDF(file)
+          if (adpResult.ytdGrossWages !== null || adpResult.ytdFederalWithholding !== null) {
+            parsedData = adpResult
+            fileType = 'adp_payroll'
+          } else {
+            const { parsePLFromPDF } = await import('@/lib/parsePL')
+            parsedData = await parsePLFromPDF(file)
+            fileType = 'pl'
+          }
+        }
+
+        // Upload to storage
+        const storagePath = await uploadDocument(user.id, clientId, taxYear, file)
+
+        // Insert document record
+        await supabase.from('documents').insert({
+          created_by:   user.id,
+          client_id:    clientId,
+          file_name:    file.name,
+          file_type:    fileType,
+          storage_path: storagePath,
+          file_size:    file.size,
+          tax_year:     taxYear,
+          parsed_data:  parsedData as unknown as Record<string, unknown>,
+          status:       'applied',
+        })
+
+        const typeLabel = fileType === 'adp_payroll' ? 'ADP Payroll' : 'P&L'
+        let detail = typeLabel
+        if (fileType === 'adp_payroll' && parsedData) {
+          const adp = parsedData as ADPExtractedData
+          if (adp.ytdGrossWages !== null) detail += ` · Salary: $${adp.ytdGrossWages.toLocaleString()}`
+        } else if (fileType === 'pl' && parsedData) {
+          const pl = parsedData as PLExtractedData
+          if (pl.netIncome !== null) detail += ` · Net Income: $${pl.netIncome.toLocaleString()}`
+        }
+
+        results.push({ name: file.name, type: detail, status: 'done' })
+      } catch (err) {
+        results.push({ name: file.name, type: '', status: err instanceof Error ? err.message : 'Upload failed' })
+      }
+    }
+
+    setUploadResults(results)
+    setUploading(false)
+    refetchDocs()
+
+    const successCount = results.filter(r => r.status === 'done').length
+    if (successCount > 0) toast(`${successCount} document${successCount > 1 ? 's' : ''} uploaded`)
+  }, [user, clientId, taxYear, refetchDocs, toast])
+
+  const hasDocuments = !loading && documents.length > 0
 
   return (
     <>
@@ -253,7 +336,7 @@ function DocumentsPanel({ clientId }: { clientId: string }) {
         >
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-semibold text-slate-700">Documents</h2>
-            <Badge variant="neutral">{documents.length}</Badge>
+            {hasDocuments && <Badge variant="neutral">{documents.length}</Badge>}
           </div>
           <svg
             className={`w-4 h-4 text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
@@ -264,34 +347,80 @@ function DocumentsPanel({ clientId }: { clientId: string }) {
         </button>
 
         {expanded && (
-          <div className="divide-y divide-slate-100">
-            {documents.map(doc => (
-              <div key={doc.id} className="px-5 py-3 flex items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">{doc.file_name}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    <Badge variant={doc.file_type === 'adp_payroll' ? 'info' : 'neutral'} className="mr-2">
-                      {doc.file_type === 'adp_payroll' ? 'ADP' : 'P&L'}
-                    </Badge>
-                    {doc.quarter && `${doc.quarter} `}{doc.tax_year}
-                    {' · '}{formatDate(doc.created_at)}
-                    {doc.status === 'applied' && <Badge variant="success" className="ml-2">Applied</Badge>}
-                  </p>
+          <div>
+            {/* Upload drop zone */}
+            <div className="px-5 py-4 border-b border-slate-100">
+              <DropZone
+                onFiles={handleFiles}
+                disabled={uploading}
+                label="Upload P&L or Payroll PDFs"
+                hint="Files are automatically detected as P&L or ADP Payroll and parsed"
+              />
+              {uploading && (
+                <div className="mt-3 flex items-center gap-2 text-sm text-slate-500">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-600" />
+                  Processing...
                 </div>
-                <button
-                  onClick={() => handleView(doc.storage_path)}
-                  className="text-xs text-orange-600 hover:text-orange-800 font-medium"
-                >
-                  View
-                </button>
-                <button
-                  onClick={() => setConfirmDelete({ id: doc.id, path: doc.storage_path, name: doc.file_name })}
-                  className="text-xs text-red-400 hover:text-red-600"
-                >
-                  Delete
-                </button>
+              )}
+              {uploadResults.length > 0 && (
+                <div className="mt-3 space-y-1">
+                  {uploadResults.map((r, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs">
+                      {r.status === 'done' ? (
+                        <>
+                          <svg className="w-3.5 h-3.5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className="text-slate-700 truncate">{r.name}</span>
+                          <span className="text-slate-400">{r.type}</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-3.5 h-3.5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                          <span className="text-slate-700 truncate">{r.name}</span>
+                          <span className="text-red-500">{r.status}</span>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Existing documents list */}
+            {hasDocuments && (
+              <div className="divide-y divide-slate-100">
+                {documents.map(doc => (
+                  <div key={doc.id} className="px-5 py-3 flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900 truncate">{doc.file_name}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        <Badge variant={doc.file_type === 'adp_payroll' ? 'info' : 'neutral'} className="mr-2">
+                          {doc.file_type === 'adp_payroll' ? 'ADP' : 'P&L'}
+                        </Badge>
+                        {doc.quarter && `${doc.quarter} `}{doc.tax_year}
+                        {' · '}{formatDate(doc.created_at)}
+                        {doc.status === 'applied' && <Badge variant="success" className="ml-2">Applied</Badge>}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleView(doc.storage_path)}
+                      className="text-xs text-orange-600 hover:text-orange-800 font-medium"
+                    >
+                      View
+                    </button>
+                    <button
+                      onClick={() => setConfirmDelete({ id: doc.id, path: doc.storage_path, name: doc.file_name })}
+                      className="text-xs text-red-400 hover:text-red-600"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         )}
       </div>
@@ -570,7 +699,7 @@ export default function ClientDetail() {
 
       {!loading && <QuarterComparison reports={reports} />}
 
-      {id && <DocumentsPanel clientId={id} />}
+      {id && <DocumentsPanel clientId={id} taxYear={new Date().getFullYear()} />}
 
       <ConfirmModal
         open={!!deleteTarget}
