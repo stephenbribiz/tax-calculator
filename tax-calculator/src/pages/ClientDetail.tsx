@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useReports } from '@/hooks/useReports'
 import { useClients } from '@/hooks/useClients'
 import { useDocuments } from '@/hooks/useDocuments'
@@ -317,10 +317,12 @@ function DocumentsPanel({ clientId }: { clientId: string }) {
 
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>()
-  const { clients, refetch: refreshClients } = useClients()
+  const navigate = useNavigate()
+  const { clients, refetch: refreshClients, deleteClient } = useClients()
   const { reports, loading, deleteReport } = useReports(id)
   const { toast } = useToast()
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [confirmDeleteClient, setConfirmDeleteClient] = useState(false)
   const [notes, setNotes] = useState<string | null>(null)
   const [notesInitialized, setNotesInitialized] = useState(false)
   const [clientCode, setClientCode] = useState<string | null>(null)
@@ -411,9 +413,17 @@ export default function ClientDetail() {
             )}
           </div>
         </div>
-        <Link to={`/reports/new?client=${client.id}`}>
-          <Button size="sm">+ New Tax Plan</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setConfirmDeleteClient(true)}
+            className="text-xs text-red-400 hover:text-red-600 font-medium"
+          >
+            Delete Client
+          </button>
+          <Link to={`/reports/new?client=${client.id}`}>
+            <Button size="sm">+ New Tax Plan</Button>
+          </Link>
+        </div>
       </div>
 
       {!loading && reports.length > 0 && (
@@ -583,6 +593,25 @@ export default function ClientDetail() {
             toast('Tax plan deleted')
           }
           setDeleteTarget(null)
+        }}
+      />
+
+      <ConfirmModal
+        open={confirmDeleteClient}
+        title="Delete Client"
+        message={`Permanently delete ${client.owner_name} and all of their tax plans? This cannot be undone.`}
+        confirmLabel="Delete Client"
+        variant="danger"
+        onCancel={() => setConfirmDeleteClient(false)}
+        onConfirm={async () => {
+          const error = await deleteClient(client.id)
+          if (error) {
+            toast('Failed to delete client', 'error')
+            setConfirmDeleteClient(false)
+          } else {
+            toast(`${client.owner_name} deleted`)
+            navigate('/clients')
+          }
         }}
       />
     </div>
