@@ -113,7 +113,7 @@ export default function BulkUpload() {
           // Lazy-load parsers
           const { extractTextFromPDF } = await import('@/lib/pdfUtils')
           const rawText = await extractTextFromPDF(pf.file)
-          const fileType = detectDocumentType(rawText)
+          let fileType = detectDocumentType(rawText)
 
           let parsedData: PLExtractedData | ADPExtractedData | null = null
           if (fileType === 'pl') {
@@ -122,6 +122,20 @@ export default function BulkUpload() {
           } else if (fileType === 'adp_payroll') {
             const { parseADPFromPDF } = await import('@/lib/parseADP')
             parsedData = await parseADPFromPDF(pf.file)
+          } else {
+            // Unknown type — try both parsers and use whichever extracts data
+            console.log(`[BulkUpload] Unknown file type for "${pf.file.name}", trying both parsers`)
+            const { parseADPFromPDF } = await import('@/lib/parseADP')
+            const adpResult = await parseADPFromPDF(pf.file)
+            if (adpResult.ytdGrossWages !== null || adpResult.ytdFederalWithholding !== null) {
+              parsedData = adpResult
+              fileType = 'adp_payroll'
+              console.log(`[BulkUpload] → detected as ADP via parser fallback`)
+            } else {
+              const { parsePLFromPDF } = await import('@/lib/parsePL')
+              parsedData = await parsePLFromPDF(pf.file)
+              fileType = 'pl'
+            }
           }
 
           // Match client by code
@@ -138,7 +152,7 @@ export default function BulkUpload() {
 
           setFiles(prev => prev.map(f => f.id === pf.id ? {
             ...f,
-            fileType: fileType === 'unknown' ? 'pl' : fileType, // default unknown to pl
+            fileType,
             parsedData,
             status,
             matchedClient,
