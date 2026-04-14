@@ -10,6 +10,7 @@
 import ExcelJS from 'exceljs'
 import type { TaxInput, TaxOutput } from '@/types'
 import { getTaxDataByYear } from '@/tax-engine/constants'
+import { formatCurrency } from '@/lib/utils'
 
 /* ─── Colours (ARGB) ──────────────────────────────────────────────────────── */
 const C_ORANGE   = 'FFE8842C'
@@ -176,7 +177,7 @@ function buildTaxDataSheet(ws: ExcelJS.Worksheet, input: TaxInput) {
    TAX PLAN SHEET
    Row numbers tracked in R{} so all formulas reference live cells.
 ═══════════════════════════════════════════════════════════════════════════ */
-function buildTaxPlanSheet(ws: ExcelJS.Worksheet, input: TaxInput, output: TaxOutput) {
+function buildCalculationsSheet(ws: ExcelJS.Worksheet, input: TaxInput, output: TaxOutput): Record<string, number> {
   ws.columns = [{ width: 40 }, { width: 18 }, { width: 42 }]
 
   const isSCorp      = input.companyType === 'S-Corp'
@@ -564,6 +565,240 @@ function buildTaxPlanSheet(ws: ExcelJS.Worksheet, input: TaxInput, output: TaxOu
     row.height = 32
     row.commit()
   }
+
+  return R
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SUMMARY SHEET — simple, matches the screen layout
+   Values are cross-sheet references to the Calculations sheet.
+═══════════════════════════════════════════════════════════════════════════ */
+function buildSummarySheet(
+  ws: ExcelJS.Worksheet,
+  input: TaxInput,
+  output: TaxOutput,
+  R: Record<string, number>,
+) {
+  const { federal, state, scorp } = output
+  const isScorp = input.companyType === 'S-Corp'
+  const C = 'Calculations'
+  const ref = (key: string) => `=${C}!$B$${R[key]}`
+  const isOverpaid = output.netAmountDue === 0 && input.priorEstimatesPaid > output.totalTaxOwed
+
+  ws.columns = [{ width: 42 }, { width: 18 }]
+
+  let r = 1
+
+  function row(
+    label: string,
+    key: string | null,
+    val: ExcelJS.CellValue,
+    styleFn: (row: ExcelJS.Row) => void,
+    fmt?: string,
+  ) {
+    if (key) R2[key] = r
+    const ro = ws.getRow(r++)
+    ro.getCell(1).value = label
+    ro.getCell(2).value = val
+    if (fmt) ro.getCell(2).numFmt = fmt
+    styleFn(ro)
+    ro.commit()
+  }
+
+  function blank() { ws.getRow(r++).commit() }
+  function sec(lbl: string) { row(lbl, null, null, styleSection) }
+
+  function data(lbl: string, val: ExcelJS.CellValue, fmt?: string, indent = false) {
+    const ro = ws.getRow(r++)
+    ro.getCell(1).value = lbl
+    if (val !== null) ro.getCell(2).value = val
+    if (fmt) ro.getCell(2).numFmt = fmt
+    ro.getCell(1).font  = { size: 10, color: { argb: C_CHARCOAL } }
+    ro.getCell(1).alignment = { horizontal: 'left', indent: indent ? 4 : 2 }
+    ro.getCell(2).font  = { size: 10, color: { argb: indent ? C_SLATE : C_CHARCOAL } }
+    ro.getCell(2).alignment = { horizontal: 'right' }
+    ro.getCell(2).border = { bottom: { style: 'hair', color: { argb: C_HAIR } } }
+    ro.commit()
+  }
+
+  function subtotalRow(lbl: string, val: ExcelJS.CellValue, fmt = FMT_CCY) {
+    row(lbl, null, val, styleSubtotal, fmt)
+  }
+
+  function totalDue(lbl: string, val: ExcelJS.CellValue) {
+    row(lbl, null, val, styleNetDue, FMT_CCY)
+  }
+
+  function orangeRow(lbl: string, val: ExcelJS.CellValue, fmt = FMT_CCY) {
+    const ro = ws.getRow(r++)
+    ro.getCell(1).value = lbl
+    ro.getCell(2).value = val
+    ro.getCell(2).numFmt = fmt
+    for (let c = 1; c <= 2; c++) {
+      ro.getCell(c).fill = fill(C_LT_ORA)
+      ro.getCell(c).font = { bold: true, size: 10, color: { argb: C_DARK_ORA } }
+    }
+    ro.getCell(1).alignment = { horizontal: 'left', indent: 2 }
+    ro.getCell(2).alignment = { horizontal: 'right' }
+    ro.height = 18
+    ro.commit()
+  }
+
+  /* ── Title ── */
+  {
+    const titleRow = ws.getRow(r++)
+    ws.mergeCells(`A${r - 1}:B${r - 1}`)
+    titleRow.getCell(1).value = `Quarterly Tax Plan — ${input.ownerName} — ${input.quarter} ${input.taxYear}`
+    titleRow.getCell(1).font  = { bold: true, size: 14, color: { argb: C_CHARCOAL } }
+    titleRow.getCell(1).fill  = fill('FFF5E6D3')
+    titleRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle', indent: 2 }
+    titleRow.height = 30
+    titleRow.commit()
+  }
+
+  /* ── Client info ── */
+  {
+    const infoRow = ws.getRow(r++)
+    ws.mergeCells(`A${r - 1}:B${r - 1}`)
+    infoRow.getCell(1).value = `${input.companyName}  ·  ${input.companyType}  ·  ${input.filingStatus}  ·  ${state.stateName}`
+    infoRow.getCell(1).font = { size: 9, color: { argb: C_SLATE } }
+    infoRow.getCell(1).alignment = { horizontal: 'left', indent: 2 }
+    infoRow.commit()
+  }
+  blank()
+
+  /* ── TOTAL ESTIMATE ── */
+  sec(`TOTAL ESTIMATE — ${input.quarter} ${input.taxYear}`)
+  data(`Federal Tax (${input.quarter})`, fv(ref('federalOwed'), output.totalFederalOwed), FMT_CCY)
+  data(`State Tax — ${state.stateName} (${input.quarter})`, fv(ref('stateOwed'), output.totalStateOwed), FMT_CCY)
+  subtotalRow('Total Estimated Tax Owed', fv(ref('summaryTotal'), output.totalTaxOwed))
+  if (input.priorEstimatesPaid > 0) {
+    data('Prior Estimated Payments', fv(ref('summaryPrior'), input.priorEstimatesPaid), FMT_CCY)
+  }
+  totalDue(
+    isOverpaid ? 'Overpaid (applied to next quarter)' : `Net Amount Due for ${input.quarter}`,
+    fv(ref('netAmountDue'), output.netAmountDue),
+  )
+  blank()
+
+  /* ── INCOME SUMMARY ── */
+  sec(`INCOME SUMMARY — ${input.quarter} ${input.taxYear} (${output.quarterProration * 100}% of year)`)
+  data('Business Net Income', fv(ref('businessNetIncome'), input.businessNetIncome), FMT_CCY)
+  data(`Allocated to Owner (${input.ownershipPct}%)`, fv(ref('allocatedIncome'), output.allocatedBusinessIncome), FMT_CCY)
+  if (output.mealAddBack > 0) {
+    data('Meal Add-Back (50% non-deductible)', fv(ref('mealAddBack'), output.mealAddBack), FMT_CCY)
+  }
+  if (output.seTaxDeduction > 0) {
+    data('SE Tax Deduction (50% of SE tax)', fv(ref('seTaxDeduction'), output.seTaxDeduction), FMT_CCY)
+  }
+  if (output.qbiDeduction > 0) {
+    data('QBI Deduction (20%)', fv(ref('qbiDeduction'), output.qbiDeduction), FMT_CCY)
+  }
+  data(
+    `Deduction Applied (${output.effectiveDeduction !== output.standardDeduction ? 'Itemized' : 'Standard'}, prorated for ${input.quarter})`,
+    fv(ref('proratedDeduction'), output.effectiveDeduction),
+    FMT_CCY,
+  )
+  if (input.otherIncome + input.spousalIncome > 0) {
+    data(
+      'Other / Spousal Income (bracket placement only)',
+      fv(`=${C}!$B$${R.otherIncome}+${C}!$B$${R.spousalIncome}`, input.otherIncome + input.spousalIncome),
+      FMT_CCY,
+    )
+  }
+  subtotalRow('Federal Taxable Income', fv(ref('taxableIncomeFinal'), output.taxableIncome))
+  data('Marginal Tax Rate', federal.marginalRate, FMT_PCT)
+  data('Effective Federal Rate', federal.effectiveFederalRate, FMT_PCT)
+  blank()
+
+  /* ── FEDERAL TAX BREAKDOWN ── */
+  sec(`FEDERAL TAX BREAKDOWN — ${input.quarter} ${input.taxYear}`)
+  data('Gross Federal Income Tax', fv(ref('grossFederalTax'), federal.grossIncomeTax), FMT_CCY)
+  if (federal.childTaxCredit > 0) {
+    data(`Child Tax Credit (${input.numDependentChildren} child${input.numDependentChildren !== 1 ? 'ren' : ''})`, fv(ref('childTaxCredit'), federal.childTaxCredit), FMT_CCY)
+  }
+  data('Net Federal Income Tax', fv(ref('netFederalTax'), federal.netIncomeTax), FMT_CCY)
+
+  if (isScorp) {
+    data('FICA — Employer Portion (est.)', fv(`=${C}!$B$${R.entityTaxTotal}/2`, federal.ficaAlreadyPaid / 2), FMT_CCY, true)
+    data('FICA — Employee Portion (est.)', fv(`=${C}!$B$${R.entityTaxTotal}/2`, federal.ficaAlreadyPaid / 2), FMT_CCY, true)
+    data('FICA Already Paid via Payroll', fv(ref('entityTaxTotal'), federal.ficaAlreadyPaid), FMT_CCY)
+    if (scorp && scorp.additionalFICA > 0) {
+      data(`Additional FICA (salary adj. to ${formatCurrency(scorp.adjustedSalary)})`, scorp.additionalFICA, FMT_CCY)
+    }
+    if (input.federalWithholding > 0) {
+      data('Federal Income Tax Withheld', fv(ref('federalWithholding'), input.federalWithholding), FMT_CCY)
+    }
+  } else {
+    data('Self-Employment Tax', fv(ref('entityTaxTotal'), federal.seTax), FMT_CCY)
+    data('Social Security (12.4%)', fv(ref('seSS'), federal.seSocialSecurity), FMT_CCY, true)
+    data('Medicare (2.9%)', fv(ref('seMedicare'), federal.seMedicare), FMT_CCY, true)
+    if (federal.seAdditionalMedicare > 0) {
+      data('Additional Medicare (0.9%)', fv(ref('seAddlMedicare'), federal.seAdditionalMedicare), FMT_CCY, true)
+    }
+  }
+
+  orangeRow(`Federal Owed for ${input.quarter}`, fv(ref('federalOwed'), output.totalFederalOwed))
+  blank()
+
+  /* ── S-CORP SALARY ANALYSIS ── */
+  if (isScorp && scorp) {
+    sec('S-CORP SALARY ANALYSIS')
+    data('Current Shareholder Salary (YTD)', fv(ref('corpSalary'), scorp.currentSalary), FMT_CCY)
+    data('Recommended Minimum Salary (40%)', fv(ref('corpRecommended'), scorp.recommendedMinSalary), FMT_CCY)
+    data('FICA on Current Salary (employer + employee)', fv(ref('corpCurrentFICA'), scorp.currentFICA), FMT_CCY)
+    data('FICA at Recommended Salary', fv(ref('corpRecFICA'), scorp.recommendedFICA), FMT_CCY)
+    if (scorp.ficaGap > 0) {
+      data('FICA Gap (recommended vs current)', fv(ref('corpFICAGap'), scorp.ficaGap), FMT_CCY)
+    }
+    blank()
+  }
+
+  /* ── STATE TAX ── */
+  sec(`${state.stateName.toUpperCase()} STATE TAX`)
+  if (state.stateIncomeTax > 0) {
+    data('State Deduction', state.stateDeduction, FMT_CCY)
+    data('Effective State Rate', state.effectiveStateRate, FMT_PCT)
+    data('State Income Tax (before proration)', state.stateIncomeTax, FMT_CCY)
+  } else {
+    data(`No individual income tax in ${state.stateName}`, 0, FMT_CCY)
+  }
+  if (state.exciseTax > 0 || state.franchiseTax > 0) {
+    data(`${input.companyType} Excise Tax (6.5%)`, fv(ref('tnExcise'), state.exciseTax), FMT_CCY)
+    data('Franchise Tax (minimum)', state.franchiseTax, FMT_CCY)
+    data('Annual F&E Total', state.exciseTax + state.franchiseTax, FMT_CCY)
+    if ((input.priorFEPaid ?? 0) > 0) {
+      data('Prior F&E Payments', input.priorFEPaid ?? 0, FMT_CCY)
+    }
+    data('F&E Owed', Math.max(0, state.exciseTax + state.franchiseTax - (input.priorFEPaid ?? 0)), FMT_CCY)
+  }
+  orangeRow(`State Owed for ${input.quarter}`, fv(ref('stateOwed'), output.totalStateOwed))
+  if (state.notes.length > 0) {
+    blank()
+    state.notes.forEach(note => {
+      const ro = ws.getRow(r++)
+      ws.mergeCells(`A${r - 1}:B${r - 1}`)
+      ro.getCell(1).value = `• ${note}`
+      ro.getCell(1).font = { size: 9, italic: true, color: { argb: C_SLATE } }
+      ro.getCell(1).alignment = { horizontal: 'left', indent: 2 }
+      ro.commit()
+    })
+  }
+  blank()
+
+  /* ── Disclaimer ── */
+  {
+    const ro = ws.getRow(r++)
+    ws.mergeCells(`A${r - 1}:B${r - 1}`)
+    ro.getCell(1).value =
+      'DISCLAIMER: This estimate is for planning purposes only and does not constitute tax advice. ' +
+      'Consult a qualified tax professional for filing decisions. ' +
+      'See the "Calculations" tab for detailed formula workings.'
+    ro.getCell(1).font = { size: 8, italic: true, color: { argb: C_SLATE } }
+    ro.getCell(1).alignment = { wrapText: true, indent: 1 }
+    ro.height = 28
+    ro.commit()
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -575,16 +810,20 @@ export async function exportTaxPlanToExcel(input: TaxInput, output: TaxOutput): 
   wb.created  = new Date()
   wb.modified = new Date()
 
-  const planSheet = wb.addWorksheet('Tax Plan')
-  const dataSheet = wb.addWorksheet('TaxData')
+  // Build Calculations sheet first so R (row registry) is populated
+  const calcSheet    = wb.addWorksheet('Calculations')
+  const summarySheet = wb.addWorksheet('Tax Plan')
+  const dataSheet    = wb.addWorksheet('TaxData')
 
   buildTaxDataSheet(dataSheet, input)
-  buildTaxPlanSheet(planSheet, input, output)
+  const R = buildCalculationsSheet(calcSheet, input, output)
+  buildSummarySheet(summarySheet, input, output, R)
 
-  // Make Tax Plan the active sheet
-  planSheet.state = 'visible'
-  dataSheet.state = 'visible'
-  wb.views = [{ activeTab: 0, x: 0, y: 0, width: 10000, height: 20000, firstSheet: 0, visibility: 'visible' }]
+  // Tax Plan (summary) is the active first sheet
+  summarySheet.state = 'visible'
+  calcSheet.state    = 'visible'
+  dataSheet.state    = 'visible'
+  wb.views = [{ activeTab: 1, x: 0, y: 0, width: 10000, height: 20000, firstSheet: 0, visibility: 'visible' }]
 
   const buffer  = await wb.xlsx.writeBuffer()
   const blob    = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
