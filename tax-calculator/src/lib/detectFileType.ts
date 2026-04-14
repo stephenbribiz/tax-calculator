@@ -3,6 +3,10 @@
  */
 export function detectDocumentType(text: string): 'pl' | 'adp_payroll' | 'unknown' {
   // ADP payroll patterns (check first — more specific)
+  // "Payroll Details" is the ADP Run report title
+  if (/Payroll\s+Details/i.test(text) && /(FED\s+FIT|FED\s+SOCSEC|Regular|Pay\s+Period)/i.test(text)) {
+    return 'adp_payroll'
+  }
   if (/ADP/i.test(text) && /(payroll|earnings|pay\s+statement|wage)/i.test(text)) {
     return 'adp_payroll'
   }
@@ -10,6 +14,10 @@ export function detectDocumentType(text: string): 'pl' | 'adp_payroll' | 'unknow
     return 'adp_payroll'
   }
   if (/earnings\s+statement/i.test(text) && /(gross\s+pay|federal\s+income\s+tax|FIT)/i.test(text)) {
+    return 'adp_payroll'
+  }
+  // Pay Period line is a strong ADP indicator
+  if (/Pay Period from:/i.test(text) && /FED\s+FIT/i.test(text)) {
     return 'adp_payroll'
   }
 
