@@ -50,11 +50,11 @@ export default function Dashboard() {
           <p className="text-sm text-slate-500 mt-1">Quarterly tax estimates</p>
         </div>
         <div className="flex gap-3">
-          <Link to="/clients/new">
-            <Button>+ New Client</Button>
+          <Link to="/upload">
+            <Button>Bulk Upload</Button>
           </Link>
-          <Link to="/calculator">
-            <Button variant="secondary">Quick Calculator</Button>
+          <Link to="/clients/new">
+            <Button variant="secondary">+ New Client</Button>
           </Link>
         </div>
       </div>

@@ -10,7 +10,7 @@ export default function ClientList() {
   const filteredClients = clients.filter(c => {
     if (!search) return true
     const q = search.toLowerCase()
-    return c.owner_name.toLowerCase().includes(q) || c.company_name.toLowerCase().includes(q)
+    return c.owner_name.toLowerCase().includes(q) || c.company_name.toLowerCase().includes(q) || (c.client_code ?? '').toLowerCase().includes(q)
   })
 
   return (
@@ -37,6 +37,7 @@ export default function ClientList() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
+                  <th className="text-left text-xs font-semibold text-slate-500 px-5 py-3">Code</th>
                   <th className="text-left text-xs font-semibold text-slate-500 px-5 py-3">Owner</th>
                   <th className="text-left text-xs font-semibold text-slate-500 px-5 py-3">Company</th>
                   <th className="text-left text-xs font-semibold text-slate-500 px-5 py-3">Type</th>
@@ -48,7 +49,7 @@ export default function ClientList() {
                 {filteredClients.length === 0
                   ? (
                     <tr>
-                      <td colSpan={5} className="text-center text-slate-400 py-8">
+                      <td colSpan={6} className="text-center text-slate-400 py-8">
                         {clients.length === 0
                           ? <>No clients yet. <Link to="/clients/new" className="text-orange-600 hover:underline">Add your first client →</Link></>
                           : 'No clients match your search.'
@@ -58,6 +59,9 @@ export default function ClientList() {
                   )
                   : filteredClients.map(client => (
                     <tr key={client.id} className="hover:bg-slate-50">
+                      <td className="px-5 py-3 font-mono text-xs text-orange-600 font-bold">
+                        {client.client_code || '—'}
+                      </td>
                       <td className="px-5 py-3">
                         <Link to={`/clients/${client.id}`} className="font-medium text-orange-600 hover:underline">
                           {client.owner_name}

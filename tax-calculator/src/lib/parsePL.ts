@@ -1,10 +1,4 @@
-import * as pdfjsLib from 'pdfjs-dist'
-
-// Use the bundled worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url,
-).toString()
+import { extractTextFromPDF, findYTDAmount } from '@/lib/pdfUtils'
 
 /**
  * Fields we can extract from a P&L statement
@@ -17,94 +11,6 @@ export interface PLExtractedData {
   mealExpense: number | null           // → mealExpense
   shareholderDraw: number | null       // → shareholderDraw (distributions)
   rawText: string                      // full extracted text for debugging
-}
-
-/**
- * Extract text content from a PDF file
- */
-async function extractTextFromPDF(file: File): Promise<string> {
-  const arrayBuffer = await file.arrayBuffer()
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
-
-  const pages: string[] = []
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i)
-    const content = await page.getTextContent()
-
-    // Group text items by their Y position to reconstruct lines
-    const lineMap = new Map<number, { x: number; text: string }[]>()
-    for (const item of content.items) {
-      if (!('str' in item)) continue
-      // Round Y to nearest 3px to group items that are on the same visual line
-      // but have slightly different baselines (common in PDF rendering)
-      const rawY = (item as { transform: number[] }).transform[5]
-      const y = Math.round(rawY / 3) * 3
-      if (!lineMap.has(y)) lineMap.set(y, [])
-      lineMap.get(y)!.push({
-        x: (item as { transform: number[] }).transform[4],
-        text: item.str,
-      })
-    }
-
-    // Sort lines by Y (descending = top to bottom) and items by X
-    const sortedLines = Array.from(lineMap.entries())
-      .sort(([a], [b]) => b - a)
-      .map(([, items]) =>
-        items
-          .sort((a, b) => a.x - b.x)
-          .map(i => i.text)
-          .join('\t')
-          .trim()
-      )
-      .filter(line => line.length > 0)
-
-    pages.push(sortedLines.join('\n'))
-  }
-
-  return pages.join('\n\n--- Page Break ---\n\n')
-}
-
-/**
- * Parse a dollar amount from text, handling parentheses for negatives.
- * Matches: $1,234.56, $(1,234.56), (1,234.56), $1234, -$1,234.56, etc.
- */
-function parseDollarAmount(text: string): number | null {
-  const cleaned = text.trim()
-
-  // Match amounts: $1,234.56 or $(1,234.56) or (1,234.56) or -1,234.56 or $ 1,234.56
-  const match = cleaned.match(/\$?\s*\(?\s*\$?\s*[-−]?\s*([\d,]+(?:\.\d{1,2})?)\s*\)?/)
-  if (!match) return null
-
-  const numStr = match[1].replace(/,/g, '')
-  const value = parseFloat(numStr)
-  if (isNaN(value)) return null
-
-  // Negative if wrapped in parens: ($541.70) or $(541.70) or has minus/en-dash
-  const isNegative = /\(.*\d.*\)/.test(cleaned) || /[-−]/.test(cleaned)
-  return isNegative ? -value : value
-}
-
-/**
- * Extract the YTD (last/rightmost) dollar amount from a line.
- * AgilLink format: "Label \t monthly_amount \t ytd_amount"
- * QuickBooks format: "Label    amount"
- * preserveSign: if true, keeps negative values (for net income)
- */
-function findYTDAmount(line: string, preserveSign = false): number | null {
-  // Find all dollar amounts on the line — handles:
-  // $1,234.56, $(1,234.56), ($1,234.56), (1,234.56), -$1,234.56, $1234, 1234.56
-  const amounts = line.match(/[-−]?\s*\$?\s*\(?\s*\$?\s*[\d,]+(?:\.\d{1,2})?\s*\)?/g)
-  if (!amounts || amounts.length === 0) return null
-
-  // Filter out matches that are just whitespace or don't actually contain digits
-  const validAmounts = amounts.filter(a => /\d/.test(a))
-  if (validAmounts.length === 0) return null
-
-  // Take the LAST amount (YTD / rightmost column)
-  const val = parseDollarAmount(validAmounts[validAmounts.length - 1])
-  if (val === null) return null
-
-  return preserveSign ? val : Math.abs(val)
 }
 
 /**

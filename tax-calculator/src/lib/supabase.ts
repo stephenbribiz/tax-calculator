@@ -40,6 +40,7 @@ export interface DbClient {
   ownership_pct: number
   num_dependents: number
   notes: string | null
+  client_code: string | null
 }
 
 export interface DbReport {
@@ -53,4 +54,20 @@ export interface DbReport {
   input_snapshot: Record<string, unknown>
   output_snapshot: Record<string, unknown>
   is_final: boolean
+}
+
+export interface DbDocument {
+  id: string
+  created_at: string
+  created_by: string
+  client_id: string
+  file_name: string
+  file_type: 'pl' | 'adp_payroll'
+  storage_path: string
+  file_size: number | null
+  tax_year: number
+  quarter: string | null
+  parsed_data: Record<string, unknown> | null
+  status: 'pending' | 'applied' | 'skipped'
+  report_id: string | null
 }

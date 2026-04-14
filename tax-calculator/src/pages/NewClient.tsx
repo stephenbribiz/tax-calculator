@@ -15,6 +15,7 @@ import type { CompanyType, FilingStatus, StateCode } from '@/types'
 interface ClientFormData {
   companyName: string
   ownerName: string
+  clientCode: string
   companyType: CompanyType
   state: StateCode
   filingStatus: FilingStatus
@@ -34,6 +35,7 @@ export default function NewClient() {
     defaultValues: {
       companyName: '',
       ownerName: '',
+      clientCode: '',
       companyType: 'S-Corp',
       state: 'TN',
       filingStatus: 'Single',
@@ -58,6 +60,7 @@ export default function NewClient() {
         filing_status:  data.filingStatus,
         ownership_pct:  data.ownershipPct,
         num_dependents: data.numDependents,
+        client_code:    data.clientCode ? data.clientCode.toUpperCase() : null,
         notes:          data.notes || null,
         created_by:     user.id,
       }, { onConflict: 'company_name,created_by' })
@@ -98,12 +101,30 @@ export default function NewClient() {
             />
           </div>
 
-          <Select
-            label="Company Type"
-            options={COMPANY_TYPE_OPTIONS}
-            error={errors.companyType?.message}
-            {...register('companyType', { required: 'Required' })}
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Select
+              label="Company Type"
+              options={COMPANY_TYPE_OPTIONS}
+              error={errors.companyType?.message}
+              {...register('companyType', { required: 'Required' })}
+            />
+            <Input
+              label="Client Code"
+              placeholder="e.g., GBG"
+              hint="2–4 letter shortcode for bulk upload matching"
+              maxLength={4}
+              style={{ textTransform: 'uppercase' }}
+              error={errors.clientCode?.message}
+              {...register('clientCode', {
+                pattern: {
+                  value: /^[A-Za-z]{0,4}$/,
+                  message: '2–4 letters only',
+                },
+                validate: v => !v || v.length >= 2 || 'Must be 2–4 letters',
+              })}
+            />
+          </div>
+
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select
