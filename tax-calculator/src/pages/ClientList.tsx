@@ -7,27 +7,54 @@ import type { DbClient } from '@/lib/supabase'
 type SortField = 'owner' | 'company'
 
 /**
- * Extract the last name from a free-text owner name for sorting purposes.
+ * Parse a free-text owner name into sortable and displayable parts.
  *
- * Handles formats like:
- *   "John Smith"              → "Smith"
- *   "John & Jane Smith"       → "Smith"
- *   "John Smith & Jane Smith" → "Smith"
- *   "Smith, John"             → "Smith"
- *   "Mary-Jane O'Brien"       → "O'Brien"
+ * Input formats handled:
+ *   "John Smith"              → { last: "Smith",   first: "John",  spouse: "" }
+ *   "John & Jane Smith"       → { last: "Smith",   first: "John",  spouse: "Jane" }
+ *   "John Smith & Jane Smith" → { last: "Smith",   first: "John",  spouse: "Jane" }
+ *   "John Smith & Jane Jones" → { last: "Smith",   first: "John",  spouse: "Jane" }
+ *   "Smith, John"             → { last: "Smith",   first: "John",  spouse: "" }
+ *   "Smith, John & Jane"      → { last: "Smith",   first: "John",  spouse: "Jane" }
+ *   "Mary-Jane O'Brien"       → { last: "O'Brien", first: "Mary-Jane", spouse: "" }
  */
-function getLastName(ownerName: string): string {
-  // Take only the primary owner (before "&" or "and")
-  const primary = ownerName.split(/\s+[&]\s+|\s+and\s+/i)[0].trim()
+function parseName(ownerName: string): { last: string; first: string; spouse: string } {
+  const [primaryRaw, spouseRaw = ''] = ownerName.split(/\s+[&]\s+|\s+and\s+/i).map(s => s.trim())
 
-  // Handle "Lastname, Firstname" format
-  if (primary.includes(',')) {
-    return primary.split(',')[0].trim()
+  let last = ''
+  let first = ''
+
+  if (primaryRaw.includes(',')) {
+    // "Last, First" format
+    const [l, f = ''] = primaryRaw.split(',').map(s => s.trim())
+    last  = l
+    first = f
+  } else {
+    // "First [Middle] Last" format
+    const words = primaryRaw.split(/\s+/).filter(Boolean)
+    last  = words[words.length - 1] ?? primaryRaw
+    first = words.slice(0, -1).join(' ')
   }
 
-  // Take the last word as the surname
-  const words = primary.split(/\s+/).filter(Boolean)
-  return words[words.length - 1] ?? primary
+  // Spouse: just the first word (first name) of the second segment
+  const spouse = spouseRaw.split(/\s+/)[0] ?? ''
+
+  return { last, first, spouse }
+}
+
+/**
+ * Format an owner name for display as "Last, First [& SpouseFirst]".
+ *
+ * Examples:
+ *   "John Smith"        → "Smith, John"
+ *   "John & Jane Smith" → "Smith, John & Jane"
+ *   "Smith, John"       → "Smith, John"  (already correct)
+ */
+export function formatOwnerName(ownerName: string): string {
+  const { last, first, spouse } = parseName(ownerName)
+  if (!last) return ownerName  // fallback: couldn't parse, show as-is
+  const base = first ? `${last}, ${first}` : last
+  return spouse ? `${base} & ${spouse}` : base
 }
 
 function sortClients(clients: DbClient[], sortField: SortField): DbClient[] {
@@ -35,11 +62,14 @@ function sortClients(clients: DbClient[], sortField: SortField): DbClient[] {
     if (sortField === 'company') {
       return a.company_name.toLowerCase().localeCompare(b.company_name.toLowerCase())
     }
-    // owner: sort by last name, then full name
-    const lastA = getLastName(a.owner_name).toLowerCase()
-    const lastB = getLastName(b.owner_name).toLowerCase()
-    if (lastA !== lastB) return lastA.localeCompare(lastB)
-    return a.owner_name.toLowerCase().localeCompare(b.owner_name.toLowerCase())
+    // Sort: last name → first name → spouse first name
+    const na = parseName(a.owner_name)
+    const nb = parseName(b.owner_name)
+    const lastCmp = na.last.toLowerCase().localeCompare(nb.last.toLowerCase())
+    if (lastCmp !== 0) return lastCmp
+    const firstCmp = na.first.toLowerCase().localeCompare(nb.first.toLowerCase())
+    if (firstCmp !== 0) return firstCmp
+    return na.spouse.toLowerCase().localeCompare(nb.spouse.toLowerCase())
   })
 }
 
@@ -141,7 +171,7 @@ export default function ClientList() {
                       </td>
                       <td className="px-5 py-3">
                         <Link to={`/clients/${client.id}`} className="font-medium text-orange-600 hover:underline">
-                          {client.owner_name}
+                          {formatOwnerName(client.owner_name)}
                         </Link>
                       </td>
                       <td className="px-5 py-3 text-slate-600">{client.company_name}</td>

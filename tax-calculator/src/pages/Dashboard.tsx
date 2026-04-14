@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatOwnerName } from '@/pages/ClientList'
 import type { TaxOutput } from '@/types'
 
 /**
@@ -120,7 +121,7 @@ export default function Dashboard() {
                   to={`/clients/${client.id}`}
                   className="block bg-white rounded-lg border border-slate-200 px-4 py-3 hover:border-orange-300 hover:shadow-sm transition-all"
                 >
-                  <p className="text-sm font-medium text-slate-900">{client.owner_name}</p>
+                  <p className="text-sm font-medium text-slate-900">{formatOwnerName(client.owner_name)}</p>
                   <p className="text-xs text-slate-500">{client.company_name} · {client.company_type}</p>
                 </Link>
               ))
