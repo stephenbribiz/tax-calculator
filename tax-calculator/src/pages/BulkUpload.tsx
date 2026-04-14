@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useClients } from '@/hooks/useClients'
@@ -73,6 +73,21 @@ export default function BulkUpload() {
   // Track client list with any newly created clients
   const clientsRef = useRef(clients)
   clientsRef.current = clients
+
+  // Re-run matching whenever clients finish loading (handles race condition where
+  // PDF parsing completes before the Supabase client list returns)
+  useEffect(() => {
+    if (clients.length === 0) return
+    setFiles(prev => prev.map(f => {
+      if (f.status !== 'new_client' && f.status !== 'unmatched') return f
+      if (!f.clientCode) return f
+      const matched = clients.find(
+        c => c.client_code?.toUpperCase() === f.clientCode!.toUpperCase()
+      ) ?? null
+      if (matched) return { ...f, matchedClient: matched, status: 'matched' }
+      return f
+    }))
+  }, [clients])
 
   // ── Parse dropped files ──
   const handleFiles = useCallback(async (newFiles: File[]) => {
