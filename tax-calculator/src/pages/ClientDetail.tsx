@@ -325,6 +325,8 @@ export default function ClientDetail() {
   const [notesInitialized, setNotesInitialized] = useState(false)
   const [clientCode, setClientCode] = useState<string | null>(null)
   const [codeInitialized, setCodeInitialized] = useState(false)
+  const [codeEditing, setCodeEditing] = useState(false)
+  const [codeInput, setCodeInput] = useState('')
   const [codeSaving, setCodeSaving] = useState(false)
 
   const client = clients.find(c => c.id === id)
@@ -339,16 +341,29 @@ export default function ClientDetail() {
     setCodeInitialized(true)
   }
 
+  function startEditCode() {
+    setCodeInput(clientCode ?? '')
+    setCodeEditing(true)
+  }
+
+  function cancelEditCode() {
+    setCodeEditing(false)
+    setCodeInput('')
+  }
+
   async function saveClientCode() {
     if (!client) return
     setCodeSaving(true)
-    const code = (clientCode ?? '').trim().toUpperCase()
+    const code = codeInput.trim().toUpperCase()
     await supabase
       .from('clients')
       .update({ client_code: code || null })
       .eq('id', client.id)
+    setClientCode(code || null)
     await refreshClients()
     setCodeSaving(false)
+    setCodeEditing(false)
+    setCodeInput('')
     toast('Client code saved')
   }
 
@@ -408,27 +423,46 @@ export default function ClientDetail() {
       <div className="mb-6 grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="sm:col-span-1">
           <label className="block text-xs font-semibold text-slate-500 mb-1">Client Code</label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={clientCode ?? ''}
-              onChange={e => setClientCode(e.target.value.replace(/[^A-Za-z]/g, '').slice(0, 4))}
-              onKeyDown={e => { if (e.key === 'Enter') saveClientCode() }}
-              placeholder="e.g., GBG"
-              maxLength={4}
-              style={{ textTransform: 'uppercase' }}
-              className="text-sm text-slate-600 bg-slate-50 rounded-lg p-3 border border-slate-200 w-full focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none font-mono"
-            />
-            <Button
-              size="sm"
-              onClick={saveClientCode}
-              loading={codeSaving}
-              disabled={codeSaving}
-              className="shrink-0"
-            >
-              Save
-            </Button>
-          </div>
+          {codeEditing ? (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={codeInput}
+                onChange={e => setCodeInput(e.target.value.replace(/[^A-Za-z]/g, '').slice(0, 4))}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') saveClientCode()
+                  if (e.key === 'Escape') cancelEditCode()
+                }}
+                placeholder="e.g., GBG"
+                maxLength={4}
+                autoFocus
+                style={{ textTransform: 'uppercase' }}
+                className="text-sm text-slate-600 bg-white rounded-lg p-3 border border-orange-400 ring-1 ring-orange-400 w-full focus:outline-none font-mono"
+              />
+              <Button size="sm" onClick={saveClientCode} loading={codeSaving} disabled={codeSaving} className="shrink-0">
+                Save
+              </Button>
+              <button
+                onClick={cancelEditCode}
+                className="text-xs text-slate-400 hover:text-slate-600 px-1"
+                aria-label="Cancel"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-sm font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg px-3 py-3 min-w-[72px] tracking-widest">
+                {clientCode || <span className="text-slate-400 font-normal tracking-normal">—</span>}
+              </span>
+              <button
+                onClick={startEditCode}
+                className="text-xs text-orange-600 hover:text-orange-800 font-medium"
+              >
+                Edit
+              </button>
+            </div>
+          )}
           <p className="text-[10px] text-slate-400 mt-1">2–4 letters for bulk upload matching</p>
         </div>
         <div className="sm:col-span-3">
