@@ -61,7 +61,7 @@ export default function AdminAuditLog() {
   if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600" />
       </div>
     )
   }
@@ -174,7 +174,7 @@ export default function AdminAuditLog() {
             <button
               onClick={loadData}
               disabled={loading}
-              className="text-sm text-blue-600 hover:text-blue-800 font-medium px-3 py-1.5"
+              className="text-sm text-orange-600 hover:text-orange-800 font-medium px-3 py-1.5"
             >
               {loading ? 'Loading...' : 'Refresh'}
             </button>
@@ -247,7 +247,7 @@ export default function AdminAuditLog() {
 function ActionBadge({ action, table }: { action: string; table: string }) {
   const colors: Record<string, string> = {
     INSERT: 'bg-green-100 text-green-800',
-    UPDATE: 'bg-blue-100 text-blue-800',
+    UPDATE: 'bg-orange-100 text-orange-800',
     DELETE: 'bg-red-100 text-red-800',
   }
   const labels: Record<string, string> = {

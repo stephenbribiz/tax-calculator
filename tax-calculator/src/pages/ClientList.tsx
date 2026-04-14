@@ -27,7 +27,7 @@ export default function ClientList() {
         value={search}
         onChange={e => setSearch(e.target.value)}
         placeholder="Search clients..."
-        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
       />
 
       {loading
@@ -50,7 +50,7 @@ export default function ClientList() {
                     <tr>
                       <td colSpan={5} className="text-center text-slate-400 py-8">
                         {clients.length === 0
-                          ? <>No clients yet. <Link to="/clients/new" className="text-blue-600 hover:underline">Add your first client →</Link></>
+                          ? <>No clients yet. <Link to="/clients/new" className="text-orange-600 hover:underline">Add your first client →</Link></>
                           : 'No clients match your search.'
                         }
                       </td>
@@ -59,7 +59,7 @@ export default function ClientList() {
                   : filteredClients.map(client => (
                     <tr key={client.id} className="hover:bg-slate-50">
                       <td className="px-5 py-3">
-                        <Link to={`/clients/${client.id}`} className="font-medium text-blue-600 hover:underline">
+                        <Link to={`/clients/${client.id}`} className="font-medium text-orange-600 hover:underline">
                           {client.owner_name}
                         </Link>
                       </td>

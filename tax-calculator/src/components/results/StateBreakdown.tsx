@@ -75,9 +75,9 @@ export function StateBreakdown({ input, output }: Props) {
           </>
         )}
 
-        <div className="flex justify-between items-center py-1.5 bg-blue-50 -mx-1 px-1 rounded">
-          <span className="text-sm font-semibold text-blue-800">State Owed for {input.quarter}</span>
-          <span className="text-sm font-bold text-blue-900">{formatCurrency(output.totalStateOwed)}</span>
+        <div className="flex justify-between items-center py-1.5 bg-orange-50 -mx-1 px-1 rounded">
+          <span className="text-sm font-semibold text-orange-800">State Owed for {input.quarter}</span>
+          <span className="text-sm font-bold text-orange-900">{formatCurrency(output.totalStateOwed)}</span>
         </div>
       </div>
 

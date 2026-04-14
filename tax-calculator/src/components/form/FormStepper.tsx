@@ -25,8 +25,8 @@ export function FormStepper({ currentStep }: FormStepperProps) {
             <div className="flex flex-col items-center">
               <div className={cn(
                 'w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-colors',
-                isCompleted ? 'bg-blue-600 text-white' :
-                isActive    ? 'bg-blue-600 text-white ring-4 ring-blue-100' :
+                isCompleted ? 'bg-orange-600 text-white' :
+                isActive    ? 'bg-orange-600 text-white ring-4 ring-orange-100' :
                               'bg-slate-200 text-slate-500',
               )}>
                 {isCompleted ? (
@@ -37,7 +37,7 @@ export function FormStepper({ currentStep }: FormStepperProps) {
               </div>
               <span className={cn(
                 'text-xs mt-1 font-medium',
-                isActive ? 'text-blue-600' : isCompleted ? 'text-slate-600' : 'text-slate-400',
+                isActive ? 'text-orange-600' : isCompleted ? 'text-slate-600' : 'text-slate-400',
               )}>
                 {step.label}
               </span>
@@ -45,7 +45,7 @@ export function FormStepper({ currentStep }: FormStepperProps) {
             {!isLast && (
               <div className={cn(
                 'w-16 h-0.5 mb-4 mx-1',
-                isCompleted ? 'bg-blue-600' : 'bg-slate-200',
+                isCompleted ? 'bg-orange-600' : 'bg-slate-200',
               )} />
             )}
           </div>

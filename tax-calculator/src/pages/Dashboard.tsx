@@ -88,14 +88,14 @@ export default function Dashboard() {
         <div className="lg:col-span-1">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-slate-700">Clients</h2>
-            <Link to="/clients" className="text-xs text-blue-600 hover:underline">View all</Link>
+            <Link to="/clients" className="text-xs text-orange-600 hover:underline">View all</Link>
           </div>
           <input
             type="text"
             value={clientSearch}
             onChange={e => setClientSearch(e.target.value)}
             placeholder="Search clients..."
-            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
           />
           <div className="space-y-2">
             {clientsLoading
@@ -106,7 +106,7 @@ export default function Dashboard() {
                 <Link
                   key={client.id}
                   to={`/clients/${client.id}`}
-                  className="block bg-white rounded-lg border border-slate-200 px-4 py-3 hover:border-blue-300 hover:shadow-sm transition-all"
+                  className="block bg-white rounded-lg border border-slate-200 px-4 py-3 hover:border-orange-300 hover:shadow-sm transition-all"
                 >
                   <p className="text-sm font-medium text-slate-900">{client.owner_name}</p>
                   <p className="text-xs text-slate-500">{client.company_name} · {client.company_type}</p>
@@ -145,7 +145,7 @@ export default function Dashboard() {
                       ? (
                         <tr>
                           <td colSpan={4} className="text-center text-slate-400 py-8">
-                            No tax plans yet. <Link to="/reports/new" className="text-blue-600 hover:underline">Create your first tax plan →</Link>
+                            No tax plans yet. <Link to="/reports/new" className="text-orange-600 hover:underline">Create your first tax plan →</Link>
                           </td>
                         </tr>
                       )
@@ -154,7 +154,7 @@ export default function Dashboard() {
                         return (
                           <tr key={report.id} className="hover:bg-slate-50 transition-colors">
                             <td className="px-4 py-3">
-                              <Link to={`/reports/${report.id}`} className="font-medium text-slate-900 hover:text-blue-600">
+                              <Link to={`/reports/${report.id}`} className="font-medium text-slate-900 hover:text-orange-600">
                                 {(report.input_snapshot as Record<string, string>).ownerName}
                               </Link>
                               <p className="text-xs text-slate-400">{(report.input_snapshot as Record<string, string>).companyName}</p>

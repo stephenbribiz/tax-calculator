@@ -48,7 +48,7 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(fu
           placeholder="0"
           className={cn(
             'w-full pl-7 pr-3 py-2 text-sm border rounded-lg transition-colors',
-            'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+            'focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent',
             error
               ? 'border-red-400 bg-red-50'
               : 'border-slate-300 bg-white hover:border-slate-400',

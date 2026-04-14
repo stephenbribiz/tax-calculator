@@ -19,7 +19,7 @@ export function Toggle({ checked, onChange, label, hint }: ToggleProps) {
         />
         <div className={cn(
           'w-10 h-6 rounded-full transition-colors',
-          checked ? 'bg-blue-600' : 'bg-slate-300 group-hover:bg-slate-400',
+          checked ? 'bg-orange-600' : 'bg-slate-300 group-hover:bg-slate-400',
         )}>
           <div className={cn(
             'absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform',

@@ -67,10 +67,10 @@ export function SCorpAnalysis({ scorp, onAdjustedSalaryChange }: Props) {
           <div className="divide-y divide-slate-100">
             <Row label="FICA at Adjusted Salary" value={formatCurrency(scorp.adjustedFICA)} />
             <div className="flex justify-between items-center py-1.5">
-              <span className={`text-sm font-medium ${isRefund ? 'text-green-700' : 'text-blue-700'}`}>
+              <span className={`text-sm font-medium ${isRefund ? 'text-green-700' : 'text-orange-700'}`}>
                 {isRefund ? 'FICA Refund (subtracted from tax total)' : 'Additional FICA (added to tax total)'}
               </span>
-              <span className={`text-sm font-bold ${isRefund ? 'text-green-700' : 'text-blue-700'}`}>
+              <span className={`text-sm font-bold ${isRefund ? 'text-green-700' : 'text-orange-700'}`}>
                 {isRefund ? `− ${formatCurrency(Math.abs(scorp.additionalFICA))}` : `+ ${formatCurrency(scorp.additionalFICA)}`}
               </span>
             </div>

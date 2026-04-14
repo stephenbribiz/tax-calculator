@@ -58,9 +58,9 @@ export function FederalBreakdown({ input, output }: Props) {
           <span className="text-sm font-semibold text-slate-800">Federal Total</span>
           <span className="text-sm font-bold text-slate-900">{formatCurrency(federal.totalFederalBeforeProration)}</span>
         </div>
-        <div className="flex justify-between items-center py-1.5 bg-blue-50 -mx-1 px-1 rounded">
-          <span className="text-sm font-semibold text-blue-800">Federal Owed for {input.quarter}</span>
-          <span className="text-sm font-bold text-blue-900">{formatCurrency(output.totalFederalOwed)}</span>
+        <div className="flex justify-between items-center py-1.5 bg-orange-50 -mx-1 px-1 rounded">
+          <span className="text-sm font-semibold text-orange-800">Federal Owed for {input.quarter}</span>
+          <span className="text-sm font-bold text-orange-900">{formatCurrency(output.totalFederalOwed)}</span>
         </div>
       </div>
     </Card>

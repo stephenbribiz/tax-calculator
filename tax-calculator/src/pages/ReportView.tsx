@@ -54,7 +54,7 @@ export default function ReportView() {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
         <p className="text-red-500">{error || 'Tax plan not found.'}</p>
-        <Link to="/" className="text-sm text-blue-600 hover:underline mt-2 block">← Back to Dashboard</Link>
+        <Link to="/" className="text-sm text-orange-600 hover:underline mt-2 block">← Back to Dashboard</Link>
       </div>
     )
   }

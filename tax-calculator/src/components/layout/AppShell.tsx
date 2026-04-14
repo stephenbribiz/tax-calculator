@@ -16,7 +16,7 @@ function NavLink({ to, children, onClick }: { to: string; children: React.ReactN
       onClick={onClick}
       className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
         isActive
-          ? 'bg-blue-50 text-blue-700'
+          ? 'bg-orange-50 text-orange-700'
           : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
       }`}
     >
@@ -45,13 +45,10 @@ export function AppShell({ children }: AppShellProps) {
           </svg>
         </button>
         <div className="flex items-center gap-2 ml-3">
-          <div className="w-6 h-6 bg-blue-600 rounded-md flex items-center justify-center flex-shrink-0">
-            <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <span className="text-sm font-bold text-slate-900">Tax Estimate Calculator</span>
+          <span className="text-sm font-black tracking-tight">
+            <span style={{ color: '#4A4A4A' }}>BRI</span><span style={{ color: '#E8842C' }}>BIZ</span>
+          </span>
+          <span className="text-xs text-slate-400">Tax Calculator</span>
         </div>
       </div>
 
@@ -70,14 +67,14 @@ export function AppShell({ children }: AppShellProps) {
         } md:translate-x-0`}
       >
         <div className="px-4 py-5 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <span className="text-sm font-bold text-slate-900 leading-tight">Tax Estimate<br />Calculator</span>
+          <div className="flex flex-col">
+            <span className="text-lg font-black tracking-tight leading-tight">
+              <span style={{ color: '#4A4A4A' }}>BRI</span><span style={{ color: '#E8842C' }}>BIZ</span>
+            </span>
+            <span className="text-[9px] font-semibold tracking-[0.08em] uppercase" style={{ color: '#9B9B9B' }}>
+              Entertainment Business Mgmt
+            </span>
+            <span className="text-[10px] text-slate-400 mt-1">Tax Calculator</span>
           </div>
         </div>
 

@@ -164,7 +164,7 @@ function QuarterComparison({ reports: allReports }: { reports: DbReport[] }) {
                   onClick={() => setSelectedYear(year)}
                   className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
                     year === activeYear
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-orange-600 text-white'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
@@ -297,7 +297,7 @@ export default function ClientDetail() {
           onChange={e => setNotes(e.target.value)}
           onBlur={saveNotes}
           placeholder="Add notes about this client..."
-          className="text-sm text-slate-600 bg-slate-50 rounded-lg p-3 border border-slate-200 w-full resize-y focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+          className="text-sm text-slate-600 bg-slate-50 rounded-lg p-3 border border-slate-200 w-full resize-y focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none"
         />
       </div>
 
@@ -340,7 +340,7 @@ export default function ClientDetail() {
                     return (
                       <tr key={report.id} className="hover:bg-slate-50">
                         <td className="px-5 py-3">
-                          <Link to={`/reports/${report.id}`} className="font-medium text-blue-600 hover:underline">
+                          <Link to={`/reports/${report.id}`} className="font-medium text-orange-600 hover:underline">
                             {report.quarter} {report.tax_year}
                           </Link>
                         </td>
@@ -359,13 +359,13 @@ export default function ClientDetail() {
                         <td className="px-5 py-3 text-right space-x-3">
                           <Link
                             to={`/reports/new?edit=${report.id}`}
-                            className="text-xs text-blue-500 hover:text-blue-700"
+                            className="text-xs text-orange-500 hover:text-orange-700"
                           >
                             Edit
                           </Link>
                           <Link
                             to={`/reports/new?duplicate=${report.id}`}
-                            className="text-xs text-blue-500 hover:text-blue-700"
+                            className="text-xs text-orange-500 hover:text-orange-700"
                           >
                             Duplicate
                           </Link>

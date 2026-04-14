@@ -35,7 +35,10 @@ async function extractTextFromPDF(file: File): Promise<string> {
     const lineMap = new Map<number, { x: number; text: string }[]>()
     for (const item of content.items) {
       if (!('str' in item)) continue
-      const y = Math.round((item as { transform: number[] }).transform[5])
+      // Round Y to nearest 3px to group items that are on the same visual line
+      // but have slightly different baselines (common in PDF rendering)
+      const rawY = (item as { transform: number[] }).transform[5]
+      const y = Math.round(rawY / 3) * 3
       if (!lineMap.has(y)) lineMap.set(y, [])
       lineMap.get(y)!.push({
         x: (item as { transform: number[] }).transform[4],
@@ -68,16 +71,16 @@ async function extractTextFromPDF(file: File): Promise<string> {
 function parseDollarAmount(text: string): number | null {
   const cleaned = text.trim()
 
-  // Match amounts: $1,234.56 or $(1,234.56) or (1,234.56) or -1,234.56
-  const match = cleaned.match(/\$?\(?\s*-?\s*([\d,]+(?:\.\d{1,2})?)\s*\)?/)
+  // Match amounts: $1,234.56 or $(1,234.56) or (1,234.56) or -1,234.56 or $ 1,234.56
+  const match = cleaned.match(/\$?\s*\(?\s*\$?\s*[-−]?\s*([\d,]+(?:\.\d{1,2})?)\s*\)?/)
   if (!match) return null
 
   const numStr = match[1].replace(/,/g, '')
   const value = parseFloat(numStr)
   if (isNaN(value)) return null
 
-  // Negative if wrapped in parens: ($541.70) or $(541.70)
-  const isNegative = /\(.*\d.*\)/.test(cleaned) || cleaned.includes('-')
+  // Negative if wrapped in parens: ($541.70) or $(541.70) or has minus/en-dash
+  const isNegative = /\(.*\d.*\)/.test(cleaned) || /[-−]/.test(cleaned)
   return isNegative ? -value : value
 }
 
@@ -88,27 +91,54 @@ function parseDollarAmount(text: string): number | null {
  * preserveSign: if true, keeps negative values (for net income)
  */
 function findYTDAmount(line: string, preserveSign = false): number | null {
-  // Find all dollar amounts on the line
-  const amounts = line.match(/\$?\(?\s*-?\s*[\d,]+(?:\.\d{1,2})?\s*\)?/g)
+  // Find all dollar amounts on the line — handles:
+  // $1,234.56, $(1,234.56), ($1,234.56), (1,234.56), -$1,234.56, $1234, 1234.56
+  const amounts = line.match(/[-−]?\s*\$?\s*\(?\s*\$?\s*[\d,]+(?:\.\d{1,2})?\s*\)?/g)
   if (!amounts || amounts.length === 0) return null
 
+  // Filter out matches that are just whitespace or don't actually contain digits
+  const validAmounts = amounts.filter(a => /\d/.test(a))
+  if (validAmounts.length === 0) return null
+
   // Take the LAST amount (YTD / rightmost column)
-  const val = parseDollarAmount(amounts[amounts.length - 1])
+  const val = parseDollarAmount(validAmounts[validAmounts.length - 1])
   if (val === null) return null
 
   return preserveSign ? val : Math.abs(val)
 }
 
 /**
- * Find a dollar amount for a label, checking same line and next line.
+ * Find a dollar amount for a label, checking same line and nearby lines.
+ * PDF text extraction can place amounts on adjacent lines due to Y-coordinate differences.
  */
 function findAmountForLabel(lines: string[], labelIndex: number, preserveSign = false): number | null {
+  // Check the label line itself first
   const val = findYTDAmount(lines[labelIndex], preserveSign)
   if (val !== null) return val
 
-  // Check next line if current line has no amount
-  if (labelIndex + 1 < lines.length) {
-    return findYTDAmount(lines[labelIndex + 1], preserveSign)
+  // Check the next 2 lines (amount might be slightly below the label)
+  for (let offset = 1; offset <= 2; offset++) {
+    if (labelIndex + offset < lines.length) {
+      const nextLine = lines[labelIndex + offset]
+      // Only use next line if it looks like a continuation (has amounts but no label-like text)
+      // or is very short (just a number)
+      if (nextLine && !/^[a-zA-Z]{3,}/.test(nextLine.trim())) {
+        const nextVal = findYTDAmount(nextLine, preserveSign)
+        if (nextVal !== null) return nextVal
+      }
+      // Also try if the next line has amounts regardless
+      const nextVal = findYTDAmount(nextLine, preserveSign)
+      if (nextVal !== null) return nextVal
+    }
+  }
+
+  // Check the previous line (amount might be slightly above due to Y-coordinate ordering)
+  if (labelIndex - 1 >= 0) {
+    const prevLine = lines[labelIndex - 1]
+    if (prevLine && !/^[a-zA-Z]{3,}/.test(prevLine.trim())) {
+      const prevVal = findYTDAmount(prevLine, preserveSign)
+      if (prevVal !== null) return prevVal
+    }
   }
 
   return null
@@ -118,8 +148,9 @@ function findAmountForLabel(lines: string[], labelIndex: number, preserveSign = 
 // Covers: QuickBooks, Xero, AgilLink, and common accounting formats
 const PATTERNS = {
   netIncome: [
-    /net\s+income\s*\/\s*\(?\s*loss\s*\)?/i,     // AgilLink: "Net Income / (Loss)"
-    /net\s+(ordinary\s+)?income(?!\s+and\s)/i,    // "Net Income" but NOT "Net Income and Expenses"
+    /net\s+income\s*[/\\]\s*\(?\s*loss\s*\)?/i,   // AgilLink: "Net Income / (Loss)" or "Net Income \ (Loss)"
+    /net\s+income\s*\(loss\)/i,                     // "Net Income(Loss)" or "Net Income (Loss)"
+    /net\s+(ordinary\s+)?income(?!\s+(and|from)\s)/i, // "Net Income" but NOT "Net Income and Expenses" or "Net Income from Operations"
     /net\s+profit/i,
     /net\s+income\s*[/&]\s*loss/i,
     /net\s+earnings/i,
@@ -239,7 +270,9 @@ function parseFinancialData(text: string): Omit<PLExtractedData, 'rawText'> {
           if (val !== null) {
             result.netIncome = val
           }
-          break
+          // Don't break — if this pattern matched but found no amount,
+          // continue checking other patterns on this same line
+          if (result.netIncome !== null) break
         }
       }
     }
@@ -298,6 +331,31 @@ function parseFinancialData(text: string): Omit<PLExtractedData, 'rawText'> {
           result.shareholderDraw = findAmountForLabel(lines, i)
           break
         }
+      }
+    }
+  }
+
+  // Fallback: if net income wasn't found, do a broader search
+  // This handles edge cases where the label/amount are split across lines in unexpected ways
+  if (result.netIncome === null) {
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i]
+      // Very broad match for any "net income" line
+      if (/net\s+income/i.test(line) && !/net\s+income\s+(and|from)\s/i.test(line)) {
+        // Search a wider window for amounts (±3 lines)
+        for (let offset = 0; offset <= 3; offset++) {
+          for (const idx of [i + offset, i - offset]) {
+            if (idx >= 0 && idx < lines.length && idx !== i || offset === 0) {
+              const val = findYTDAmount(lines[idx], true)
+              if (val !== null) {
+                result.netIncome = val
+                break
+              }
+            }
+          }
+          if (result.netIncome !== null) break
+        }
+        if (result.netIncome !== null) break
       }
     }
   }

@@ -148,7 +148,7 @@ export function PLUpload({ companyType, onApply }: PLUploadProps) {
           onDrop={onDrop}
           className={`border-2 border-dashed rounded-lg p-5 text-center transition-colors cursor-pointer ${
             dragging
-              ? 'border-blue-400 bg-blue-50'
+              ? 'border-orange-400 bg-orange-50'
               : 'border-slate-300 bg-slate-50 hover:border-slate-400'
           }`}
           onClick={() => document.getElementById('pl-upload-input')?.click()}
@@ -177,7 +177,7 @@ export function PLUpload({ companyType, onApply }: PLUploadProps) {
   if (parsing) {
     return (
       <div className="mb-5 border border-slate-200 rounded-lg p-5 bg-slate-50 text-center">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2" />
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-600 mx-auto mb-2" />
         <p className="text-sm text-slate-600">Reading P&L...</p>
       </div>
     )
@@ -187,15 +187,15 @@ export function PLUpload({ companyType, onApply }: PLUploadProps) {
   const foundCount = fields.filter(f => f.value !== null).length
 
   return (
-    <div className="mb-5 border border-blue-200 rounded-lg bg-blue-50 overflow-hidden">
-      <div className="px-4 py-3 border-b border-blue-200 flex items-center justify-between">
+    <div className="mb-5 border border-orange-200 rounded-lg bg-orange-50 overflow-hidden">
+      <div className="px-4 py-3 border-b border-orange-200 flex items-center justify-between">
         <div>
-          <h4 className="text-sm font-semibold text-blue-900">P&L Data Extracted</h4>
-          <p className="text-xs text-blue-700">
+          <h4 className="text-sm font-semibold text-orange-900">P&L Data Extracted</h4>
+          <p className="text-xs text-orange-700">
             Found {foundCount} of {fields.length} fields. Review and adjust before applying.
           </p>
         </div>
-        <button onClick={handleClear} className="text-xs text-blue-600 hover:text-blue-800 underline">
+        <button onClick={handleClear} className="text-xs text-orange-600 hover:text-orange-800 underline">
           Clear
         </button>
       </div>
@@ -208,7 +208,7 @@ export function PLUpload({ companyType, onApply }: PLUploadProps) {
               checked={field.enabled && field.value !== null}
               disabled={field.value === null}
               onChange={() => toggleField(idx)}
-              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              className="rounded border-slate-300 text-orange-600 focus:ring-orange-500"
             />
             <div className="flex-1 min-w-0">
               <label className="text-sm text-slate-700">{field.label}</label>
@@ -225,7 +225,7 @@ export function PLUpload({ companyType, onApply }: PLUploadProps) {
                     const num = parseFloat(raw)
                     if (!isNaN(num)) updateFieldValue(idx, num)
                   }}
-                  className="w-32 pl-6 pr-2 py-1.5 text-sm text-right border border-slate-300 rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-32 pl-6 pr-2 py-1.5 text-sm text-right border border-slate-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 />
               </div>
             ) : (
@@ -242,10 +242,10 @@ export function PLUpload({ companyType, onApply }: PLUploadProps) {
         )}
       </div>
 
-      <div className="px-4 py-3 border-t border-blue-200 flex items-center justify-between">
+      <div className="px-4 py-3 border-t border-orange-200 flex items-center justify-between">
         <button
           onClick={() => setShowRawText(!showRawText)}
-          className="text-xs text-blue-600 hover:text-blue-800 underline"
+          className="text-xs text-orange-600 hover:text-orange-800 underline"
         >
           {showRawText ? 'Hide' : 'Show'} extracted text
         </button>

@@ -146,7 +146,7 @@ export default function NewClient() {
             <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
             <textarea
               rows={3}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
               placeholder="Optional notes about this client..."
               {...register('notes')}
             />
