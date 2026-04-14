@@ -588,16 +588,12 @@ export default function ClientDetail() {
         }}
       />
 
-      <div className="mt-10 border border-red-200 rounded-xl p-5 bg-red-50">
-        <h3 className="text-sm font-semibold text-red-700 mb-1">Danger Zone</h3>
-        <p className="text-xs text-red-500 mb-3">
-          Deleting this client permanently removes their profile and all associated tax plans. This cannot be undone.
-        </p>
+      <div className="mt-10 pt-6 border-t border-slate-100 flex justify-center">
         <button
           onClick={() => setConfirmDeleteClient(true)}
-          className="text-sm font-medium text-white bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition-colors"
+          className="text-xs text-slate-400 hover:text-red-500 transition-colors"
         >
-          Delete Client
+          Delete this client
         </button>
       </div>
 
@@ -609,12 +605,20 @@ export default function ClientDetail() {
         variant="danger"
         onCancel={() => setConfirmDeleteClient(false)}
         onConfirm={async () => {
-          const { error } = await supabase.from('clients').delete().eq('id', client.id)
+          const { data, error } = await supabase
+            .from('clients')
+            .delete()
+            .eq('id', client.id)
+            .select('id')
           if (error) {
-            toast('Failed to delete client: ' + error.message, 'error')
+            console.error('Delete client error:', error)
+            toast('Error: ' + error.message, 'error')
+          } else if (!data || data.length === 0) {
+            console.error('Delete client: 0 rows affected', client.id)
+            toast('Delete failed — permission denied', 'error')
           } else {
-            toast(`${client.owner_name} deleted`)
             navigate('/clients')
+            toast(`${client.owner_name} deleted`)
           }
         }}
       />
