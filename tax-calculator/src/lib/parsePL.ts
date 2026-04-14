@@ -119,10 +119,9 @@ function findAmountForLabel(lines: string[], labelIndex: number, preserveSign = 
 const PATTERNS = {
   netIncome: [
     /net\s+income\s*\/\s*\(?\s*loss\s*\)?/i,     // AgilLink: "Net Income / (Loss)"
-    /net\s+(ordinary\s+)?income/i,
+    /net\s+(ordinary\s+)?income(?!\s+and\s)/i,    // "Net Income" but NOT "Net Income and Expenses"
     /net\s+profit/i,
     /net\s+income\s*[/&]\s*loss/i,
-    /net\s+income/i,
     /net\s+earnings/i,
     /profit\s*\(loss\)/i,
     /bottom\s+line/i,
@@ -232,31 +231,36 @@ function parseFinancialData(text: string): Omit<PLExtractedData, 'rawText'> {
     if (/^(For the Month|Ended|Year to Date|at\s+\d|Monthly Report|For the month)/i.test(line)) continue
     if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(line)) continue
 
-    // Net income — take FIRST match in the main section (preserves negative sign)
+    // Net income — take FIRST match that has an actual dollar amount (preserves negative sign)
     if (result.netIncome === null) {
       for (const pattern of PATTERNS.netIncome) {
         if (pattern.test(line)) {
-          result.netIncome = findAmountForLabel(lines, i, true)
+          const val = findAmountForLabel(lines, i, true)
+          if (val !== null) {
+            result.netIncome = val
+          }
           break
         }
       }
     }
 
-    // Total revenue — take first "Total Income" match
+    // Total revenue — take first match with an actual amount
     if (result.totalRevenue === null) {
       for (const pattern of PATTERNS.totalRevenue) {
         if (pattern.test(line)) {
-          result.totalRevenue = findAmountForLabel(lines, i)
+          const val = findAmountForLabel(lines, i)
+          if (val !== null) result.totalRevenue = val
           break
         }
       }
     }
 
-    // Total expenses — take first match
+    // Total expenses — take first match with an actual amount
     if (result.totalExpenses === null) {
       for (const pattern of PATTERNS.totalExpenses) {
         if (pattern.test(line)) {
-          result.totalExpenses = findAmountForLabel(lines, i)
+          const val = findAmountForLabel(lines, i)
+          if (val !== null) result.totalExpenses = val
           break
         }
       }
