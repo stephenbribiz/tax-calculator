@@ -15,7 +15,10 @@ import { DropZone } from '@/components/upload/DropZone'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import type { TaxOutput, TaxInput } from '@/types'
+import { COMPANY_TYPE_OPTIONS } from '@/constants/companyTypes'
+import { STATE_OPTIONS } from '@/constants/states'
+import { FILING_STATUS_OPTIONS } from '@/constants/quarters'
+import type { TaxOutput, TaxInput, CompanyType, FilingStatus, StateCode } from '@/types'
 import type { DbReport } from '@/lib/supabase'
 import type { PLExtractedData } from '@/lib/parsePL'
 import type { ADPExtractedData } from '@/lib/parseADP'
@@ -459,6 +462,17 @@ export default function ClientDetail() {
   const [codeEditing, setCodeEditing] = useState(false)
   const [codeInput, setCodeInput] = useState('')
   const [codeSaving, setCodeSaving] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editSaving, setEditSaving] = useState(false)
+  const [editForm, setEditForm] = useState({
+    company_name: '',
+    owner_name: '',
+    company_type: '' as CompanyType,
+    state: '' as StateCode,
+    filing_status: '' as FilingStatus,
+    ownership_pct: 100,
+    num_dependents: 0,
+  })
 
   const client = clients.find(c => c.id === id)
 
@@ -508,6 +522,45 @@ export default function ClientDetail() {
     refreshClients()
   }
 
+  function startEditing() {
+    if (!client) return
+    setEditForm({
+      company_name: client.company_name,
+      owner_name: client.owner_name,
+      company_type: client.company_type as CompanyType,
+      state: client.state as StateCode,
+      filing_status: (client.filing_status ?? 'Single') as FilingStatus,
+      ownership_pct: client.ownership_pct ?? 100,
+      num_dependents: client.num_dependents ?? 0,
+    })
+    setEditing(true)
+  }
+
+  async function saveEdit() {
+    if (!client) return
+    setEditSaving(true)
+    const { error } = await supabase
+      .from('clients')
+      .update({
+        company_name:   editForm.company_name,
+        owner_name:     editForm.owner_name,
+        company_type:   editForm.company_type,
+        state:          editForm.state,
+        filing_status:  editForm.filing_status,
+        ownership_pct:  editForm.ownership_pct,
+        num_dependents: editForm.num_dependents,
+      })
+      .eq('id', client.id)
+    if (error) {
+      toast('Error: ' + error.message, 'error')
+    } else {
+      await refreshClients()
+      toast('Client updated')
+      setEditing(false)
+    }
+    setEditSaving(false)
+  }
+
   if (!client) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -542,10 +595,113 @@ export default function ClientDetail() {
             )}
           </div>
         </div>
-        <Link to={`/reports/new?client=${client.id}`}>
-          <Button size="sm">+ New Tax Plan</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={startEditing}
+            className="text-xs text-slate-400 hover:text-slate-600 font-medium border border-slate-200 rounded-lg px-3 py-1.5"
+          >
+            Edit
+          </button>
+          <Link to={`/reports/new?client=${client.id}`}>
+            <Button size="sm">+ New Tax Plan</Button>
+          </Link>
+        </div>
       </div>
+
+      {/* Edit Client Panel */}
+      {editing && (
+        <div className="mb-6 bg-white rounded-xl border border-orange-200 p-5">
+          <h3 className="text-sm font-semibold text-slate-700 mb-4">Edit Client Details</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Company Name</label>
+              <input
+                type="text"
+                value={editForm.company_name}
+                onChange={e => setEditForm(f => ({ ...f, company_name: e.target.value }))}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Owner / Individual Name</label>
+              <input
+                type="text"
+                value={editForm.owner_name}
+                onChange={e => setEditForm(f => ({ ...f, owner_name: e.target.value }))}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Company Type</label>
+              <select
+                value={editForm.company_type}
+                onChange={e => setEditForm(f => ({ ...f, company_type: e.target.value as CompanyType }))}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none"
+              >
+                {COMPANY_TYPE_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">State of Residence</label>
+              <select
+                value={editForm.state}
+                onChange={e => setEditForm(f => ({ ...f, state: e.target.value as StateCode }))}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none"
+              >
+                {STATE_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Filing Status</label>
+              <select
+                value={editForm.filing_status}
+                onChange={e => setEditForm(f => ({ ...f, filing_status: e.target.value as FilingStatus }))}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none"
+              >
+                {FILING_STATUS_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Ownership %</label>
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={editForm.ownership_pct}
+                onChange={e => setEditForm(f => ({ ...f, ownership_pct: Number(e.target.value) }))}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Dependent Children</label>
+              <input
+                type="number"
+                min={0}
+                value={editForm.num_dependents}
+                onChange={e => setEditForm(f => ({ ...f, num_dependents: Number(e.target.value) }))}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <button
+              onClick={() => setEditing(false)}
+              className="text-sm text-slate-500 hover:text-slate-700 px-3 py-1.5"
+            >
+              Cancel
+            </button>
+            <Button size="sm" onClick={saveEdit} loading={editSaving} disabled={editSaving || !editForm.company_name || !editForm.owner_name}>
+              Save Changes
+            </Button>
+          </div>
+        </div>
+      )}
 
       {!loading && reports.length > 0 && (
         <ClientTaxSummary reports={reports} />
