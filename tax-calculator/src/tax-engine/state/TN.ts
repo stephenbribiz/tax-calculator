@@ -24,37 +24,45 @@ export function calculateTN(
   const fullBusinessIncome = businessNetIncome ?? 0
   const salary = shareholderSalary ?? 0
 
-  // Sole Props have no separate entity — not subject to TN F&E
-  const entitySubjectToFE = companyType === 'S-Corp' || companyType === 'LLC'
+  // Entities subject to TN Franchise Tax (minimum $100/year)
+  const entitySubjectToFranchise = companyType === 'S-Corp' || companyType === 'LLC'
     || companyType === 'Partnership' || companyType === 'Single-Member-LLC'
+
+  // Only S-Corp and Partnership owe Excise Tax (6.5% of net earnings).
+  // LLCs and Single-Member LLCs in TN are subject only to the Franchise Tax.
+  const entitySubjectToExcise = companyType === 'S-Corp' || companyType === 'Partnership'
 
   // Excise tax: 6.5% on net earnings AFTER deductible shareholder wages
   const netEarningsAfterWages = Math.max(0, fullBusinessIncome - salary)
-  const exciseTax = entitySubjectToFE && netEarningsAfterWages > 0
+  const exciseTax = entitySubjectToExcise && netEarningsAfterWages > 0
     ? netEarningsAfterWages * 0.065
     : 0
 
   // Franchise tax: 0.25% of net worth (minimum $100/year)
   // We don't have net worth data, so use the minimum as an estimate
-  const franchiseTax = entitySubjectToFE ? 100 : 0
+  const franchiseTax = entitySubjectToFranchise ? 100 : 0
 
   const notes: string[] = [
     'Tennessee has no individual state income tax.',
   ]
 
-  if (entitySubjectToFE) {
+  if (entitySubjectToFranchise) {
     const entityLabel = companyType ?? 'Entity'
-    notes.push(`${entityLabel} is subject to TN Franchise & Excise Tax.`)
-    if (exciseTax > 0) {
-      if (salary > 0) {
-        notes.push(`Excise Tax: 6.5% × $${netEarningsAfterWages.toLocaleString()} (net earnings of $${fullBusinessIncome.toLocaleString()} minus wages of $${salary.toLocaleString()}).`)
-      } else {
-        notes.push(`Excise Tax: 6.5% × $${fullBusinessIncome.toLocaleString()} net earnings.`)
+    if (entitySubjectToExcise) {
+      notes.push(`${entityLabel} is subject to TN Franchise & Excise Tax.`)
+      if (exciseTax > 0) {
+        if (salary > 0) {
+          notes.push(`Excise Tax: 6.5% × $${netEarningsAfterWages.toLocaleString()} (net earnings of $${fullBusinessIncome.toLocaleString()} minus wages of $${salary.toLocaleString()}).`)
+        } else {
+          notes.push(`Excise Tax: 6.5% × $${fullBusinessIncome.toLocaleString()} net earnings.`)
+        }
+      } else if (fullBusinessIncome <= 0) {
+        notes.push('No Excise Tax owed — business has no positive net earnings.')
+      } else if (salary >= fullBusinessIncome) {
+        notes.push('No Excise Tax owed — shareholder wages offset net earnings.')
       }
-    } else if (fullBusinessIncome <= 0) {
-      notes.push('No Excise Tax owed — business has no positive net earnings.')
-    } else if (salary >= fullBusinessIncome) {
-      notes.push('No Excise Tax owed — shareholder wages offset net earnings.')
+    } else {
+      notes.push(`${entityLabel} is subject to TN Franchise Tax only (not Excise Tax).`)
     }
     notes.push(`Franchise Tax: 0.25% on net worth (minimum $100/year). Using minimum — actual depends on entity net worth.`)
   } else if (companyType === 'Sole-Prop') {

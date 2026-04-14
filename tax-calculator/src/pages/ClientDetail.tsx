@@ -292,7 +292,7 @@ function DocumentsPanel({ clientId, taxYear }: { clientId: string; taxYear: numb
         const storagePath = await uploadDocument(user.id, clientId, taxYear, file)
 
         // Insert document record
-        await supabase.from('documents').insert({
+        const { error: insertError } = await supabase.from('documents').insert({
           created_by:   user.id,
           client_id:    clientId,
           file_name:    file.name,
@@ -301,8 +301,9 @@ function DocumentsPanel({ clientId, taxYear }: { clientId: string; taxYear: numb
           file_size:    file.size,
           tax_year:     taxYear,
           parsed_data:  parsedData as unknown as Record<string, unknown>,
-          status:       'applied',
+          status:       'pending',
         })
+        if (insertError) throw new Error(insertError.message)
 
         const typeLabel = fileType === 'adp_payroll' ? 'ADP Payroll' : 'P&L'
         let detail = typeLabel

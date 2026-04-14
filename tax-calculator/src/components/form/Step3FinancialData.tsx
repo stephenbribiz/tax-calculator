@@ -6,6 +6,9 @@ import { Toggle } from '@/components/ui/Toggle'
 import { Button } from '@/components/ui/Button'
 import { PLUpload } from '@/components/form/PLUpload'
 import { getTaxDataByYear } from '@/tax-engine/constants'
+import { useDocuments } from '@/hooks/useDocuments'
+import { formatCurrency } from '@/lib/utils'
+import type { DbDocument } from '@/lib/supabase'
 
 interface Step3Props {
   defaultValues: Step3Data
@@ -14,8 +17,117 @@ interface Step3Props {
   taxYear: number
   ownershipPct?: number
   stateCode?: string
+  clientId?: string
   onSubmit: (data: Step3Data) => void
   onBack: () => void
+}
+
+/** Small inline component showing saved docs with Apply buttons */
+function SavedDocumentPicker({
+  clientId,
+  taxYear,
+  isScorp,
+  onApplyPL,
+  onApplyADP,
+}: {
+  clientId: string
+  taxYear: number
+  isScorp: boolean
+  onApplyPL: (values: Record<string, number>) => void
+  onApplyADP: (salary: number | null, withholding: number | null) => void
+}) {
+  const { documents, loading } = useDocuments(clientId)
+
+  // Filter to current tax year only
+  const plDocs = documents.filter(d => d.file_type === 'pl' && d.tax_year === taxYear)
+  const adpDocs = documents.filter(d => d.file_type === 'adp_payroll' && d.tax_year === taxYear)
+
+  if (loading || (plDocs.length === 0 && adpDocs.length === 0)) return null
+
+  function applyPL(doc: DbDocument) {
+    const data = doc.parsed_data as {
+      netIncome?: number | null
+      officerCompensation?: number | null
+      mealExpense?: number | null
+      shareholderDraw?: number | null
+    } | null
+    if (!data) return
+
+    const values: Record<string, number> = {}
+    if (data.netIncome != null) values['businessNetIncome'] = data.netIncome
+    if (isScorp && data.officerCompensation != null) values['shareholderSalary'] = data.officerCompensation
+    if (data.mealExpense != null) values['mealExpense'] = data.mealExpense
+    if (data.shareholderDraw != null) values['shareholderDraw'] = data.shareholderDraw
+    onApplyPL(values)
+  }
+
+  function applyADP(doc: DbDocument) {
+    const data = doc.parsed_data as {
+      ytdGrossWages?: number | null
+      ytdFederalWithholding?: number | null
+    } | null
+    if (!data) return
+    onApplyADP(data.ytdGrossWages ?? null, data.ytdFederalWithholding ?? null)
+  }
+
+  function getDocLabel(doc: DbDocument) {
+    const parts: string[] = []
+    if (doc.quarter) parts.push(doc.quarter)
+    if (doc.file_type === 'pl') {
+      const data = doc.parsed_data as { netIncome?: number | null } | null
+      if (data?.netIncome != null) parts.push(`Net Income: ${formatCurrency(data.netIncome)}`)
+    } else {
+      const data = doc.parsed_data as { ytdGrossWages?: number | null; ytdFederalWithholding?: number | null } | null
+      if (data?.ytdGrossWages != null) parts.push(`Salary: ${formatCurrency(data.ytdGrossWages)}`)
+      if (data?.ytdFederalWithholding != null) parts.push(`Withholding: ${formatCurrency(data.ytdFederalWithholding)}`)
+    }
+    return parts.join(' · ')
+  }
+
+  return (
+    <div className="border border-slate-200 rounded-lg bg-slate-50 overflow-hidden mb-1">
+      <div className="px-4 py-2.5 border-b border-slate-200 bg-white">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Apply from Saved Documents ({taxYear})</p>
+      </div>
+      <div className="divide-y divide-slate-200">
+        {plDocs.map(doc => (
+          <div key={doc.id} className="flex items-center justify-between px-4 py-2.5 gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-slate-800 truncate">{doc.file_name}</p>
+              <p className="text-xs text-slate-500">{getDocLabel(doc)}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => applyPL(doc)}
+              className="shrink-0 text-xs font-medium text-orange-600 hover:text-orange-800 border border-orange-200 rounded-md px-3 py-1 bg-white hover:bg-orange-50"
+            >
+              Apply P&L
+            </button>
+          </div>
+        ))}
+        {isScorp && adpDocs.map(doc => (
+          <div key={doc.id} className="flex items-center justify-between px-4 py-2.5 gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-slate-800 truncate">{doc.file_name}</p>
+              <p className="text-xs text-slate-500">{getDocLabel(doc)}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => applyADP(doc)}
+              className="shrink-0 text-xs font-medium text-blue-600 hover:text-blue-800 border border-blue-200 rounded-md px-3 py-1 bg-white hover:bg-blue-50"
+            >
+              Apply Payroll
+            </button>
+          </div>
+        ))}
+        {!isScorp && adpDocs.length > 0 && (
+          <div className="px-4 py-2.5 text-xs text-slate-400">
+            {adpDocs.length} ADP payroll report{adpDocs.length > 1 ? 's' : ''} saved — applicable for S-Corp clients only.
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 export function Step3FinancialData({
@@ -25,6 +137,7 @@ export function Step3FinancialData({
   taxYear,
   ownershipPct = 100,
   stateCode,
+  clientId,
   onSubmit,
   onBack,
 }: Step3Props) {
@@ -36,6 +149,11 @@ export function Step3FinancialData({
     for (const [key, val] of Object.entries(values)) {
       setValue(key as keyof Step3Data, val, { shouldDirty: true, shouldValidate: true })
     }
+  }
+
+  function handleADPApply(salary: number | null, withholding: number | null) {
+    if (salary != null) setValue('shareholderSalary', salary, { shouldDirty: true, shouldValidate: true })
+    if (withholding != null) setValue('federalWithholding', withholding, { shouldDirty: true, shouldValidate: true })
   }
 
   // Get standard deduction for the selected year/filing status
@@ -50,6 +168,17 @@ export function Step3FinancialData({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+
+      {/* Saved documents quick-apply (shown only when a known client is selected) */}
+      {clientId && (
+        <SavedDocumentPicker
+          clientId={clientId}
+          taxYear={taxYear}
+          isScorp={isScorp}
+          onApplyPL={handlePLApply}
+          onApplyADP={handleADPApply}
+        />
+      )}
 
       {/* P&L Upload */}
       <PLUpload companyType={companyType} onApply={handlePLApply} />
@@ -92,7 +221,7 @@ export function Step3FinancialData({
                   )}
                 </div>
               )} />
-<Controller name="federalWithholding" control={control} render={({ field }) => (
+              <Controller name="federalWithholding" control={control} render={({ field }) => (
                 <CurrencyInput
                   label="Federal Income Tax Withheld (YTD)"
                   hint="Cumulative federal income tax withheld from shareholder payroll through this quarter."

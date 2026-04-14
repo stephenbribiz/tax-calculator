@@ -451,6 +451,7 @@ export default function NewReport() {
             taxYear={state.step2.taxYear}
             ownershipPct={state.step2.ownershipPct}
             stateCode={state.step2.state}
+            clientId={clientParam ?? editClientId ?? undefined}
             onSubmit={handleStep3}
             onBack={() => dispatch({ type: 'GO_TO_STEP', payload: 2 })}
           />
