@@ -12,6 +12,7 @@ import { Step2TaxProfile } from '@/components/form/Step2TaxProfile'
 import { Step3FinancialData } from '@/components/form/Step3FinancialData'
 import { ResultsPanel } from '@/components/results/ResultsPanel'
 import { Button } from '@/components/ui/Button'
+import { ExcelDownloadButton } from '@/components/ExcelDownloadButton'
 import { useToast } from '@/components/ui/Toast'
 
 const PDFDownloadButton = lazy(() =>
@@ -446,6 +447,7 @@ export default function NewReport() {
               >
                 ← Edit Financials
               </Button>
+              <ExcelDownloadButton input={taxInput} output={output} />
               <Suspense fallback={<Button variant="secondary" disabled>↓ PDF</Button>}>
                 <PDFDownloadButton input={taxInput} output={output} />
               </Suspense>

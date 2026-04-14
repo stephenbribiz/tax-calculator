@@ -8,12 +8,25 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { TaxOutput } from '@/types'
 
-function getCurrentQuarterLabel(): string {
-  const month = new Date().getMonth() // 0-indexed
-  if (month < 3) return 'Q1'
-  if (month < 6) return 'Q2'
-  if (month < 9) return 'Q3'
-  return 'Q4'
+/**
+ * Returns the previous calendar quarter and its tax year.
+ * We look back at what already happened to determine estimated payments,
+ * so Q1 (Jan–Mar) data is used in Q2 (Apr–Jun), etc.
+ *
+ * Apr–Jun  → Q1 of current year
+ * Jul–Sep  → Q2 of current year
+ * Oct–Dec  → Q3 of current year
+ * Jan–Mar  → Q4 of previous year
+ */
+function getPreviousQuarter(): { quarter: string; year: number } {
+  const now = new Date()
+  const month = now.getMonth() // 0-indexed
+  const year = now.getFullYear()
+
+  if (month < 3)  return { quarter: 'Q4', year: year - 1 } // Jan–Mar → Q4 last year
+  if (month < 6)  return { quarter: 'Q1', year }            // Apr–Jun → Q1
+  if (month < 9)  return { quarter: 'Q2', year }            // Jul–Sep → Q2
+  return           { quarter: 'Q3', year }                   // Oct–Dec → Q3
 }
 
 export default function Dashboard() {
@@ -21,8 +34,7 @@ export default function Dashboard() {
   const { reports, loading: reportsLoading } = useReports()
   const [clientSearch, setClientSearch] = useState('')
 
-  const currentYear = new Date().getFullYear()
-  const currentQuarter = getCurrentQuarterLabel()
+  const { quarter: currentQuarter, year: currentYear } = getPreviousQuarter()
 
   const currentYearReports = useMemo(
     () => reports.filter(r => r.tax_year === currentYear),
@@ -75,7 +87,7 @@ export default function Dashboard() {
         <Card>
           <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Current Quarter</p>
           <p className="text-3xl font-bold text-slate-900">
-            {reportsLoading ? '—' : currentQuarter}
+            {reportsLoading ? '—' : `${currentQuarter} ${currentYear}`}
           </p>
           <p className="text-xs text-slate-500 mt-1">
             {reportsLoading ? '' : `${currentQuarterCount} plan${currentQuarterCount !== 1 ? 's' : ''} created`}

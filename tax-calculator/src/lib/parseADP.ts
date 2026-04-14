@@ -62,19 +62,15 @@ function parsePayrollData(text: string): Omit<ADPExtractedData, 'rawText'> {
       }
     }
 
-    // ── Regular W-2 salary ──
-    // "Regular" at start of token (NOT "Draw NT" which is a distribution)
-    // The line may contain multiple columns tab-separated
-    // Look for "Regular" but NOT lines that are sub-totals or company totals headers
-    if (result.ytdGrossWages === null && /\bRegular\b/i.test(line)) {
-      // Skip header rows and total label rows
-      if (/^(description|total|company)/i.test(line)) continue
-
-      // The "Regular" amount is in the earnings Amount column (3rd column or last numeric before tax columns)
-      // Try to parse the first meaningful dollar amount after "Regular" on this line
-      // Format: "Regular\t0.00\t32,915.70\t..." or just "Regular  0.00  32,915.70"
-      const val = extractRegularAmount(line)
-      if (val !== null) result.ytdGrossWages = val
+    // ── Taxable earnings (shareholder salary) ──
+    // The entire report belongs to the shareholder, so we sum ALL taxable earnings.
+    // Non-taxable distributions are explicitly labeled "NT" (e.g., "Draw NT") — skip those.
+    // Skip header rows and section headers.
+    if (!/^(description|total|company|pay\s+frequency|hours\s+and)/i.test(line)) {
+      const earningsVal = extractTaxableEarnings(line)
+      if (earningsVal !== null) {
+        result.ytdGrossWages = (result.ytdGrossWages ?? 0) + earningsVal
+      }
     }
 
     // ── FED FIT (Federal Income Tax withheld) ──
@@ -109,24 +105,36 @@ function parsePayrollData(text: string): Omit<ADPExtractedData, 'rawText'> {
 }
 
 /**
- * Extract the earnings "Amount" column value from a "Regular" line.
- * ADP format has: Description | Hours | Rate | Amount | ...
- * Tab-separated, so Amount is typically the 4th token (index 3) if Hours and Rate are present,
- * or the 3rd token (index 2) if Rate is omitted.
- * We want the first non-zero number that is NOT a small hours count.
+ * Extract taxable earnings from an ADP earnings row.
+ * The entire ADP Payroll Details report belongs to the shareholder, so we
+ * sum ALL taxable earnings lines. Non-taxable items are labeled "NT"
+ * (e.g., "Draw NT", "Reimb NT") — those are excluded.
+ *
+ * ADP earnings row format:  Description | Hours | Rate | Amount | ...
+ * The columns are tab-separated. Amount is the first number > 100
+ * following the description (to exclude hours and rate which are small).
+ *
+ * Lines we want:  Regular, Salary, Bonus, Commission, Holiday, Vacation, etc.
+ * Lines we skip:  Draw NT, Reimb NT, Expense NT, or anything with " NT" suffix.
  */
-function extractRegularAmount(line: string): number | null {
-  // Split by tabs or multiple spaces
+function extractTaxableEarnings(line: string): number | null {
   const tokens = line.split(/\t|\s{2,}/).map(t => t.trim()).filter(t => t.length > 0)
+  if (tokens.length === 0) return null
 
-  // Find "Regular" token index
-  const regularIdx = tokens.findIndex(t => /^Regular$/i.test(t))
-  if (regularIdx === -1) return null
+  const desc = tokens[0]
 
-  // Look at subsequent tokens for a dollar amount (>100 to distinguish from hours/rate)
-  for (let j = regularIdx + 1; j < Math.min(tokens.length, regularIdx + 5); j++) {
+  // Must start with a known earnings-type word (not a tax/deduction label)
+  const isEarningsRow = /^(Regular|Salary|Bonus|Commission|Holiday|Vacation|Sick|PTO|Overtime|OT|Misc|Severance|Retro|Draw(?!\s+NT)|Tips|Shift)/i.test(desc)
+  if (!isEarningsRow) return null
+
+  // Explicitly skip non-taxable distributions (anything with NT suffix)
+  if (/\bNT\b/.test(desc)) return null
+
+  // Find the earnings amount: first number > 100 after the description
+  // (hours are typically 0–200, rates are typically 0–999, amounts are typically >100 for salaries)
+  for (let j = 1; j < Math.min(tokens.length, 6); j++) {
     const val = parseDollarAmount(tokens[j])
-    if (val !== null && val > 100) return val  // hours/rate are typically small numbers
+    if (val !== null && val > 100) return val
   }
 
   return null
@@ -179,10 +187,11 @@ function parseTotalsSection(
       continue
     }
 
-    // Regular salary in totals section (amounts shown with $ signs)
-    if (result.ytdGrossWages === null && /\bRegular\b/i.test(line)) {
-      const val = extractRegularAmount(line)
-      if (val !== null) result.ytdGrossWages = val
+    // Taxable earnings in totals section
+    if (/^(Regular|Salary|Bonus|Commission|Holiday|Vacation|Sick|PTO|Overtime|OT)/i.test(line)
+        && !/\bNT\b/.test(line)) {
+      const val = extractTaxableEarnings(line)
+      if (val !== null) result.ytdGrossWages = (result.ytdGrossWages ?? 0) + val
     }
 
     // FED FIT in totals section

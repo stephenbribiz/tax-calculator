@@ -11,7 +11,6 @@ export function useClients() {
     const { data, error } = await supabase
       .from('clients')
       .select('*')
-      .order('company_name')
 
     if (error) setError(error.message)
     else setClients(data ?? [])

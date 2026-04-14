@@ -325,6 +325,7 @@ export default function ClientDetail() {
   const [notesInitialized, setNotesInitialized] = useState(false)
   const [clientCode, setClientCode] = useState<string | null>(null)
   const [codeInitialized, setCodeInitialized] = useState(false)
+  const [codeSaving, setCodeSaving] = useState(false)
 
   const client = clients.find(c => c.id === id)
 
@@ -340,12 +341,15 @@ export default function ClientDetail() {
 
   async function saveClientCode() {
     if (!client) return
+    setCodeSaving(true)
     const code = (clientCode ?? '').trim().toUpperCase()
     await supabase
       .from('clients')
       .update({ client_code: code || null })
       .eq('id', client.id)
-    refreshClients()
+    await refreshClients()
+    setCodeSaving(false)
+    toast('Client code saved')
   }
 
   async function saveNotes() {
@@ -404,17 +408,28 @@ export default function ClientDetail() {
       <div className="mb-6 grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="sm:col-span-1">
           <label className="block text-xs font-semibold text-slate-500 mb-1">Client Code</label>
-          <input
-            type="text"
-            value={clientCode ?? ''}
-            onChange={e => setClientCode(e.target.value.replace(/[^A-Za-z]/g, '').slice(0, 4))}
-            onBlur={saveClientCode}
-            placeholder="e.g., GBG"
-            maxLength={4}
-            style={{ textTransform: 'uppercase' }}
-            className="text-sm text-slate-600 bg-slate-50 rounded-lg p-3 border border-slate-200 w-full focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none font-mono"
-          />
-          <p className="text-[10px] text-slate-400 mt-1">2–4 letters for bulk upload</p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={clientCode ?? ''}
+              onChange={e => setClientCode(e.target.value.replace(/[^A-Za-z]/g, '').slice(0, 4))}
+              onKeyDown={e => { if (e.key === 'Enter') saveClientCode() }}
+              placeholder="e.g., GBG"
+              maxLength={4}
+              style={{ textTransform: 'uppercase' }}
+              className="text-sm text-slate-600 bg-slate-50 rounded-lg p-3 border border-slate-200 w-full focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none font-mono"
+            />
+            <Button
+              size="sm"
+              onClick={saveClientCode}
+              loading={codeSaving}
+              disabled={codeSaving}
+              className="shrink-0"
+            >
+              Save
+            </Button>
+          </div>
+          <p className="text-[10px] text-slate-400 mt-1">2–4 letters for bulk upload matching</p>
         </div>
         <div className="sm:col-span-3">
           <label className="block text-xs font-semibold text-slate-500 mb-1">Notes</label>

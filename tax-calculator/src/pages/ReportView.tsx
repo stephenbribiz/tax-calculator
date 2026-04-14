@@ -4,11 +4,12 @@ import { supabase } from '@/lib/supabase'
 import type { TaxInput, TaxOutput } from '@/types'
 import { ResultsPanel } from '@/components/results/ResultsPanel'
 import { Button } from '@/components/ui/Button'
+import { ExcelDownloadButton } from '@/components/ExcelDownloadButton'
+import { formatDate } from '@/lib/utils'
 
 const PDFDownloadButton = lazy(() =>
   import('@/components/pdf/PDFDownloadButton').then(m => ({ default: m.PDFDownloadButton }))
 )
-import { formatDate } from '@/lib/utils'
 
 export default function ReportView() {
   const { id } = useParams<{ id: string }>()
@@ -90,6 +91,7 @@ export default function ReportView() {
           >
             Edit
           </Button>
+          <ExcelDownloadButton input={input} output={output} />
           <Suspense fallback={<Button variant="secondary" disabled>↓ PDF</Button>}>
             <PDFDownloadButton input={input} output={output} />
           </Suspense>
