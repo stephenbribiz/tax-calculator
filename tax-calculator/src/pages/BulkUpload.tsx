@@ -15,13 +15,14 @@ import type { TaxInput, Quarter, CompanyType, FilingStatus, StateCode } from '@/
 import type { PLExtractedData } from '@/lib/parsePL'
 import type { ADPExtractedData } from '@/lib/parseADP'
 
-// Current quarter helper
-function getCurrentQuarter(): Quarter {
+// Returns the previous calendar quarter (same logic as Dashboard)
+function getPreviousQuarter(): { quarter: Quarter; year: number } {
   const m = new Date().getMonth()
-  if (m < 3) return 'Q1'
-  if (m < 6) return 'Q2'
-  if (m < 9) return 'Q3'
-  return 'Q4'
+  const y = new Date().getFullYear()
+  if (m < 3)  return { quarter: 'Q4', year: y - 1 }
+  if (m < 6)  return { quarter: 'Q1', year: y }
+  if (m < 9)  return { quarter: 'Q2', year: y }
+  return       { quarter: 'Q3', year: y }
 }
 
 type FileStatus = 'parsing' | 'matched' | 'new_client' | 'unmatched' | 'assigned' | 'skipped' | 'uploading' | 'done' | 'error'
@@ -60,8 +61,9 @@ export default function BulkUpload() {
   const { user } = useAuth()
   const { clients, refetch: refetchClients } = useClients()
 
-  const [taxYear, setTaxYear] = useState(new Date().getFullYear())
-  const [quarter, setQuarter] = useState<Quarter>(getCurrentQuarter())
+  const { quarter: prevQ, year: prevYear } = getPreviousQuarter()
+  const [taxYear, setTaxYear] = useState(prevYear)
+  const [quarter, setQuarter] = useState<Quarter>(prevQ)
   const [files, setFiles] = useState<ParsedFile[]>([])
   const [phase, setPhase] = useState<'drop' | 'review' | 'processing' | 'done'>('drop')
   const [processing, setProcessing] = useState(false)

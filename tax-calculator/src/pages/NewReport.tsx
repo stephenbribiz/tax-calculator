@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import type { TaxInput, TaxOutput, Step1Data, Step2Data, Step3Data, Quarter, CompanyType, FilingStatus, StateCode } from '@/types'
 import { calculateTax } from '@/tax-engine'
 import { useFormState } from '@/hooks/useFormState'
@@ -100,6 +100,8 @@ export default function NewReport() {
   const editReportId = searchParams.get('edit')
   const duplicateReportId = searchParams.get('duplicate')
   const clientParam = searchParams.get('client')
+  // Show a loading placeholder while we fetch client data (prevents Step 1 flash)
+  const [clientLoading, setClientLoading] = useState(!!clientParam && !editReportId)
   const [editClientId, setEditClientId] = useState<string | null>(null)
   const isEditing = !!editReportId
   const duplicateLoaded = useRef(false)
@@ -223,8 +225,9 @@ export default function NewReport() {
         },
       })
 
-      // Go to Step 2 so user can confirm/change quarter and year
-      dispatch({ type: 'GO_TO_STEP', payload: 2 })
+      // Skip straight to financials — client identity and profile are pre-filled
+      dispatch({ type: 'GO_TO_STEP', payload: 3 })
+      setClientLoading(false)
     }
 
     loadClient()
@@ -381,29 +384,65 @@ export default function NewReport() {
         </div>
       )}
 
-      {state.step !== 'results' && (
+      {/* Step indicator — only for brand-new clients (no client param) */}
+      {state.step !== 'results' && !clientParam && (
         <div className="mb-8">
           <FormStepper currentStep={state.step} />
         </div>
       )}
 
-      {state.step === 1 && (
+      {/* Loading placeholder while client data fetches (prevents Step 1 flash) */}
+      {clientLoading && (
+        <div className="max-w-2xl">
+          <div className="h-10 bg-slate-100 rounded-lg animate-pulse mb-4" />
+          <div className="h-10 bg-slate-100 rounded-lg animate-pulse mb-4" />
+          <div className="h-10 bg-slate-100 rounded-lg animate-pulse" />
+        </div>
+      )}
+
+      {/* Period bar — shown for existing clients once loaded */}
+      {clientParam && !clientLoading && state.step !== 'results' && (
+        <div className="mb-6 flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-sm max-w-2xl">
+          <span className="text-slate-500">Period:</span>
+          <span className="font-semibold text-slate-900">{state.step2.quarter} {state.step2.taxYear}</span>
+          {state.step === 3 && (
+            <button
+              type="button"
+              onClick={() => dispatch({ type: 'GO_TO_STEP', payload: 2 })}
+              className="text-xs text-orange-600 hover:text-orange-800 font-medium"
+            >
+              Change
+            </button>
+          )}
+          <Link
+            to={`/clients/${clientParam}`}
+            className="ml-auto text-xs text-slate-400 hover:text-slate-600"
+          >
+            ← Back to client
+          </Link>
+        </div>
+      )}
+
+      {!clientLoading && state.step === 1 && (
         <div className="max-w-2xl">
           <Step1ClientInfo defaultValues={state.step1} onSubmit={handleStep1} />
         </div>
       )}
 
-      {state.step === 2 && (
+      {!clientLoading && state.step === 2 && (
         <div className="max-w-2xl">
           <Step2TaxProfile
             defaultValues={state.step2}
             onSubmit={handleStep2}
-            onBack={() => dispatch({ type: 'GO_TO_STEP', payload: 1 })}
+            onBack={() => {
+              if (clientParam) dispatch({ type: 'GO_TO_STEP', payload: 3 })
+              else dispatch({ type: 'GO_TO_STEP', payload: 1 })
+            }}
           />
         </div>
       )}
 
-      {state.step === 3 && (
+      {!clientLoading && state.step === 3 && (
         <div className="max-w-2xl">
           <Step3FinancialData
             defaultValues={state.step3}
