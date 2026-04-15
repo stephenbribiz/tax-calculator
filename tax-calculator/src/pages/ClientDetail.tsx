@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useCallback, useEffect } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useReports } from '@/hooks/useReports'
 import { useClients } from '@/hooks/useClients'
@@ -456,19 +456,6 @@ export default function ClientDetail() {
   const { reports, loading, deleteReport } = useReports(id)
   const { toast } = useToast()
 
-  async function toggleAssignee(name: string) {
-    if (!client) return
-    const current = client.assignees ?? []
-    const next = current.includes(name)
-      ? current.filter(n => n !== name)
-      : [...current, name]
-    const { error } = await supabase
-      .from('clients')
-      .update({ assignees: next })
-      .eq('id', client.id)
-    if (error) toast('Could not update assignment', 'error')
-    else await refreshClients()
-  }
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [confirmDeleteClient, setConfirmDeleteClient] = useState(false)
   const [notes, setNotes] = useState<string | null>(null)
@@ -500,6 +487,52 @@ export default function ClientDetail() {
   if (client && !codeInitialized) {
     setClientCode(client.client_code ?? '')
     setCodeInitialized(true)
+  }
+
+  // ── Assignee state (must come after `client` is resolved) ──
+
+  // Track which assignee groups are expanded in the UI
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
+    Stephen: false,
+    Brian: false,
+  })
+
+  // Auto-expand groups that already have sub-member assignments when client loads
+  useEffect(() => {
+    if (!client) return
+    const assignees = client.assignees ?? []
+    const updates: Record<string, boolean> = {}
+    ASSIGNEE_GROUPS.forEach(g => {
+      if (g.members.some(m => assignees.includes(m))) updates[g.lead] = true
+    })
+    if (Object.keys(updates).length > 0) {
+      setExpandedGroups(prev => ({ ...prev, ...updates }))
+    }
+  }, [client?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function toggleAssignee(name: string) {
+    if (!client) return
+    const current = client.assignees ?? []
+    let next: string[]
+
+    if (current.includes(name)) {
+      // Removing — just unassign this name, leave the parent lead alone
+      next = current.filter(n => n !== name)
+    } else {
+      // Adding — assign this name; if it's a sub-member, auto-assign the parent lead too
+      next = [...current, name]
+      const parentGroup = ASSIGNEE_GROUPS.find(g => g.members.includes(name))
+      if (parentGroup && !next.includes(parentGroup.lead)) {
+        next = [...next, parentGroup.lead]
+      }
+    }
+
+    const { error } = await supabase
+      .from('clients')
+      .update({ assignees: next })
+      .eq('id', client.id)
+    if (error) toast('Could not update assignment: ' + error.message, 'error')
+    else await refreshClients()
   }
 
   function startEditCode() {
@@ -628,38 +661,90 @@ export default function ClientDetail() {
       <div className="mb-6">
         <p className="text-xs text-slate-400 font-medium mb-2">Assigned to:</p>
         <div className="flex items-center gap-3 flex-wrap">
-          {ASSIGNEE_GROUPS.map(group => (
-            <div key={group.lead} className="flex items-center gap-1.5">
-              {/* Group label (non-clickable) */}
-              <span className="text-xs text-slate-400">{group.lead}:</span>
-              {/* Lead toggle */}
-              {[group.lead, ...group.members].map(name => {
-                const active = (client?.assignees ?? []).includes(name)
-                return (
+          {ASSIGNEE_GROUPS.map(group => {
+            const assignees = client?.assignees ?? []
+            const leadActive = assignees.includes(group.lead)
+            const activeMembers = group.members.filter(m => assignees.includes(m))
+            const isOpen = expandedGroups[group.lead] ?? false
+
+            return (
+              <div key={group.lead} className="flex flex-col gap-1.5">
+                {/* Lead row: avatar chip + chevron */}
+                <div className="flex items-center gap-0.5">
                   <button
-                    key={name}
-                    onClick={() => toggleAssignee(name)}
-                    title={active ? `Remove ${name}` : `Assign ${name}`}
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
-                      active
+                    onClick={() => toggleAssignee(group.lead)}
+                    title={leadActive ? `Remove ${group.lead}` : `Assign ${group.lead}`}
+                    className={`inline-flex items-center gap-1.5 rounded-l-full pl-1.5 pr-2.5 py-1 text-xs font-semibold transition-colors ${
+                      leadActive
                         ? 'bg-orange-500 text-white'
-                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
-                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
-                      active ? 'bg-orange-400 text-white' : 'bg-slate-300 text-slate-600'
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0 ${
+                      leadActive ? 'bg-orange-400 text-white' : 'bg-slate-300 text-slate-600'
                     }`}>
-                      {assigneeInitials(name)}
+                      {assigneeInitials(group.lead)}
                     </span>
-                    {name}
+                    {group.lead}
+                    {/* Badge: count of assigned sub-members when collapsed */}
+                    {!isOpen && activeMembers.length > 0 && (
+                      <span className="ml-0.5 bg-orange-300 text-orange-900 rounded-full text-[9px] font-bold px-1">
+                        +{activeMembers.length}
+                      </span>
+                    )}
                   </button>
-                )
-              })}
-            </div>
-          ))}
+                  {/* Expand/collapse chevron */}
+                  <button
+                    onClick={() => setExpandedGroups(prev => ({ ...prev, [group.lead]: !isOpen }))}
+                    title={isOpen ? 'Collapse' : `Expand ${group.lead}'s team`}
+                    className={`rounded-r-full px-1.5 py-1 text-xs transition-colors border-l ${
+                      leadActive
+                        ? 'bg-orange-500 text-orange-100 border-orange-400 hover:bg-orange-600'
+                        : 'bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200'
+                    }`}
+                  >
+                    <svg
+                      className={`w-3 h-3 transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`}
+                      fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Sub-members (when expanded) */}
+                {isOpen && (
+                  <div className="flex items-center gap-1 ml-2 flex-wrap">
+                    {group.members.map(name => {
+                      const active = assignees.includes(name)
+                      return (
+                        <button
+                          key={name}
+                          onClick={() => toggleAssignee(name)}
+                          title={active ? `Remove ${name}` : `Assign ${name}`}
+                          className={`inline-flex items-center gap-1.5 rounded-full pl-1 pr-2.5 py-0.5 text-xs font-medium transition-colors ${
+                            active
+                              ? 'bg-orange-400 text-white'
+                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                          }`}
+                        >
+                          <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold flex-shrink-0 ${
+                            active ? 'bg-orange-300 text-white' : 'bg-slate-200 text-slate-500'
+                          }`}>
+                            {assigneeInitials(name)}
+                          </span>
+                          {name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
         {(client?.assignees ?? []).length === 0 && (
-          <p className="text-xs text-slate-400 italic mt-1.5">No one assigned — click a name above to assign.</p>
+          <p className="text-xs text-slate-400 italic mt-1">None assigned — click a name to assign.</p>
         )}
       </div>
 
