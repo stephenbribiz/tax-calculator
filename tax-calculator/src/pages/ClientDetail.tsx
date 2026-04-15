@@ -528,16 +528,18 @@ export default function ClientDetail() {
     let next: string[]
 
     if (current.includes(name)) {
-      // Removing — just unassign this name, leave the parent lead alone
       next = current.filter(n => n !== name)
     } else {
-      // Adding — assign this name; if it's a sub-member, auto-assign the parent lead too
       next = [...current, name]
-      const parentGroup = ASSIGNEE_GROUPS.find(g => g.members.includes(name))
-      if (parentGroup && !next.includes(parentGroup.lead)) {
-        next = [...next, parentGroup.lead]
-      }
     }
+
+    // Enforce: if any sub-member is selected the parent lead must also be selected.
+    // This handles both the "add sub" case and the "remove lead while subs remain" case.
+    ASSIGNEE_GROUPS.forEach(g => {
+      if (g.members.some(m => next.includes(m)) && !next.includes(g.lead)) {
+        next = [...next, g.lead]
+      }
+    })
 
     const { error } = await supabase
       .from('clients')

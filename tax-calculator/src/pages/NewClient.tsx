@@ -53,16 +53,18 @@ export default function NewClient() {
 
   function toggleAssignee(name: string) {
     setSelectedAssignees(prev => {
-      if (prev.includes(name)) {
-        // Removing — just remove this name, leave the parent alone
-        return prev.filter(n => n !== name)
-      }
-      // Adding — also auto-add the parent lead if this is a sub-member
-      const next = [...prev, name]
-      const parentGroup = ASSIGNEE_GROUPS.find(g => g.members.includes(name))
-      if (parentGroup && !next.includes(parentGroup.lead)) {
-        next.push(parentGroup.lead)
-      }
+      let next = prev.includes(name)
+        ? prev.filter(n => n !== name)
+        : [...prev, name]
+
+      // Enforce: if any sub-member is selected the parent lead must also be selected.
+      // This handles both the "add sub" and "remove lead while subs remain" cases.
+      ASSIGNEE_GROUPS.forEach(g => {
+        if (g.members.some(m => next.includes(m)) && !next.includes(g.lead)) {
+          next = [...next, g.lead]
+        }
+      })
+
       return next
     })
   }
