@@ -33,7 +33,9 @@ function toTaxInput(s1: Step1Data, s2: Step2Data, s3: Step3Data): TaxInput {
     state:                s2.state,
     businessNetIncome:    s3.businessNetIncome,
     shareholderSalary:    s3.shareholderSalary,
-    adjustedSalary:       s3.adjustedSalary,
+    // Only pass adjustedSalary to the engine when the user has explicitly confirmed the adjustment.
+    // This keeps additionalFICA out of the tax total until confirmed.
+    adjustedSalary:       s3.payrollAdjConfirmed ? s3.adjustedSalary : 0,
     federalWithholding:   s3.federalWithholding,
     mealExpense:          s3.mealExpense,
     shareholderDraw:      s3.shareholderDraw,
@@ -64,10 +66,12 @@ function fromTaxInput(input: TaxInput): { step1: Step1Data; step2: Step2Data; st
       state:                input.state,
     },
     step3: {
-      businessNetIncome:  input.businessNetIncome,
-      shareholderSalary:  input.shareholderSalary,
-      adjustedSalary:     input.adjustedSalary ?? 0,
-      federalWithholding: input.federalWithholding ?? 0,
+      businessNetIncome:   input.businessNetIncome,
+      shareholderSalary:   input.shareholderSalary,
+      adjustedSalary:      input.adjustedSalary ?? 0,
+      // A saved plan with a non-zero adjustedSalary had it confirmed — restore that state.
+      payrollAdjConfirmed: (input.adjustedSalary ?? 0) > 0,
+      federalWithholding:  input.federalWithholding ?? 0,
       mealExpense:        input.mealExpense,
       shareholderDraw:    input.shareholderDraw,
       otherIncome:        input.otherIncome,
@@ -266,9 +270,11 @@ export default function NewReport() {
     dispatch({ type: 'GO_TO_STEP', payload: 'results' })
   }, [dispatch, state.step1, state.step2])
 
-  const handleAdjustedSalaryChange = useCallback((value: number) => {
-    const updated = { ...state.step3, adjustedSalary: value }
-    dispatch({ type: 'SET_STEP3', payload: updated })
+  // Called by SCorpAnalysis when the user types a new adjusted salary OR confirms/edits.
+  // `adjustedSalary` is the full YTD target (currentSalary + quarterlyAdditional).
+  // `confirmed` gates whether the FICA flows into the tax total.
+  const handlePayrollAdj = useCallback((adjustedSalary: number, confirmed: boolean) => {
+    dispatch({ type: 'SET_STEP3', payload: { ...state.step3, adjustedSalary, payrollAdjConfirmed: confirmed } })
   }, [dispatch, state.step3])
 
   async function handleSave() {
@@ -505,7 +511,16 @@ export default function NewReport() {
 
           {/* Right: results */}
           <div>
-            <ResultsPanel input={taxInput} output={output} onAdjustedSalaryChange={handleAdjustedSalaryChange} />
+            <ResultsPanel
+              input={taxInput}
+              output={output}
+              onPayrollAdj={handlePayrollAdj}
+              payrollAdjState={{
+                adjustedSalary:      state.step3.adjustedSalary,
+                payrollAdjConfirmed: state.step3.payrollAdjConfirmed,
+                shareholderSalary:   state.step3.shareholderSalary,
+              }}
+            />
           </div>
         </div>
       )}

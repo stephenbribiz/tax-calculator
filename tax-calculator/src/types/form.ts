@@ -19,7 +19,8 @@ export interface Step2Data {
 export interface Step3Data {
   businessNetIncome: number
   shareholderSalary: number
-  adjustedSalary: number        // S-Corp: target salary for reasonable comp (0 = no adjustment)
+  adjustedSalary: number        // S-Corp: full YTD target salary (0 = no adjustment)
+  payrollAdjConfirmed: boolean  // S-Corp: whether the adjustment is locked into the tax total
   federalWithholding: number    // S-Corp: federal income tax already withheld via payroll
   mealExpense: number
   shareholderDraw: number

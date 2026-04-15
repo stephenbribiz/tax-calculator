@@ -23,7 +23,8 @@ interface PlanRow {
   state: string
   federalIncomeTax: number
   ficaSE: number
-  payrollAdj: number
+  payrollAdj: number        // additional FICA from confirmed salary adjustment
+  payrollAdjSalary: number  // the extra payroll amount (for display)
   stateTax: number
   netDue: number
 }
@@ -72,6 +73,9 @@ export default function QuarterlyPlans() {
         federalIncomeTax: out.federal.netIncomeTax * p,
         ficaSE: (out.federal.seTax + out.federal.ficaAlreadyPaid) * p,
         payrollAdj: out.scorp?.additionalFICA ?? 0,
+        payrollAdjSalary: out.scorp
+          ? Math.max(0, (out.scorp.adjustedSalary ?? 0) - (out.scorp.currentSalary ?? 0))
+          : 0,
         stateTax: out.totalStateOwed,
         netDue: out.netAmountDue,
       }
@@ -280,7 +284,18 @@ export default function QuarterlyPlans() {
                       <td className="px-4 py-3 text-right tabular-nums text-slate-800">{formatCurrency(row.ficaSE)}</td>
                       <td className="px-4 py-3 text-right tabular-nums">
                         {row.payrollAdj !== 0
-                          ? <span className={row.payrollAdj > 0 ? 'text-orange-600' : 'text-emerald-600'}>{formatCurrency(Math.abs(row.payrollAdj))}</span>
+                          ? (
+                            <div>
+                              <span className={`block ${row.payrollAdj > 0 ? 'text-orange-600' : 'text-emerald-600'}`}>
+                                {formatCurrency(Math.abs(row.payrollAdj))}
+                              </span>
+                              {row.payrollAdjSalary > 0 && (
+                                <span className="block text-[11px] text-slate-400 mt-0.5">
+                                  +{formatCurrency(row.payrollAdjSalary)} payroll
+                                </span>
+                              )}
+                            </div>
+                          )
                           : <span className="text-slate-300">—</span>}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums text-slate-800">{formatCurrency(row.stateTax)}</td>
@@ -310,7 +325,7 @@ export default function QuarterlyPlans() {
       <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1">
         <p className="text-[11px] text-slate-400"><span className="font-medium">Federal Tax</span> — net income tax after credits, prorated for quarter</p>
         <p className="text-[11px] text-slate-400"><span className="font-medium">SE / FICA</span> — self-employment tax (sole prop) or FICA via payroll (S-Corp)</p>
-        <p className="text-[11px] text-slate-400"><span className="font-medium">Payroll Adj</span> — additional FICA if S-Corp salary is adjusted</p>
+        <p className="text-[11px] text-slate-400"><span className="font-medium">Payroll Adj</span> — confirmed additional FICA from an S-Corp salary adjustment (zero if not confirmed on the tax plan)</p>
         <p className="text-[11px] text-slate-400"><span className="font-medium">Net Due</span> — total owed after prior estimated payments</p>
       </div>
     </div>
