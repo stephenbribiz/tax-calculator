@@ -76,12 +76,16 @@ function sortClients(clients: DbClient[], sortField: SortField): DbClient[] {
   })
 }
 
-function AssignedAvatars({ assignments }: { assignments: import('@/lib/supabase').DbClientAssignment[] }) {
+function AssignedAvatars({ assignments, profiles }: {
+  assignments: import('@/lib/supabase').DbClientAssignment[]
+  profiles: import('@/lib/supabase').DbProfile[]
+}) {
   if (assignments.length === 0) return <span className="text-xs text-slate-300">—</span>
   return (
     <div className="flex items-center gap-1">
       {assignments.slice(0, 3).map(a => {
-        const name = a.profiles?.full_name?.trim() || a.profiles?.email?.split('@')[0] || '?'
+        const p = profiles.find(pr => pr.id === a.user_id)
+        const name = p?.full_name?.trim() || p?.email?.split('@')[0] || '?'
         const initials = name.split(' ').map((p: string) => p[0]).slice(0, 2).join('').toUpperCase()
         return (
           <span
@@ -236,7 +240,7 @@ export default function ClientList() {
                       <td className="px-5 py-3 text-slate-500">{client.state}</td>
                       <td className="px-5 py-3 text-slate-500">{client.filing_status}</td>
                       <td className="px-5 py-3">
-                        <AssignedAvatars assignments={client.client_assignments ?? []} />
+                        <AssignedAvatars assignments={client.client_assignments ?? []} profiles={profiles} />
                       </td>
                     </tr>
                   ))
