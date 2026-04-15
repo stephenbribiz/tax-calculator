@@ -1,13 +1,13 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { useAuth } from '@/hooks/useAuth'
-import { useProfiles } from '@/hooks/useProfiles'
 import { supabase } from '@/lib/supabase'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
+import { ASSIGNEE_GROUPS, assigneeInitials } from '@/lib/assignees'
 import { COMPANY_TYPE_OPTIONS } from '@/constants/companyTypes'
 import { STATE_OPTIONS } from '@/constants/states'
 import { FILING_STATUS_OPTIONS } from '@/constants/quarters'
@@ -25,24 +25,47 @@ interface ClientFormData {
   notes: string
 }
 
-function displayName(profile: { full_name: string; email: string }): string {
-  return profile.full_name?.trim() || profile.email?.split('@')[0] || 'Unknown'
-}
-
-function initials(profile: { full_name: string; email: string }): string {
-  const name = displayName(profile)
-  const parts = name.split(' ')
-  return (parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : name.slice(0, 2)).toUpperCase()
-}
-
 export default function NewClient() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
-  const { profiles } = useProfiles()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [selectedStaff, setSelectedStaff] = useState<string[]>([])
+
+  // Assignee state — mirrors ClientDetail
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
+    Stephen: false,
+    Brian: false,
+  })
+  const assigneeContainerRef = useRef<HTMLDivElement>(null)
+
+  // Collapse groups when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (assigneeContainerRef.current && !assigneeContainerRef.current.contains(e.target as Node)) {
+        setExpandedGroups({ Stephen: false, Brian: false })
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  function toggleAssignee(name: string) {
+    setSelectedAssignees(prev => {
+      if (prev.includes(name)) {
+        // Removing — just remove this name, leave the parent alone
+        return prev.filter(n => n !== name)
+      }
+      // Adding — also auto-add the parent lead if this is a sub-member
+      const next = [...prev, name]
+      const parentGroup = ASSIGNEE_GROUPS.find(g => g.members.includes(name))
+      if (parentGroup && !next.includes(parentGroup.lead)) {
+        next.push(parentGroup.lead)
+      }
+      return next
+    })
+  }
 
   const { register, handleSubmit, formState: { errors } } = useForm<ClientFormData>({
     defaultValues: {
@@ -57,12 +80,6 @@ export default function NewClient() {
       notes: '',
     },
   })
-
-  function toggleStaff(userId: string) {
-    setSelectedStaff(prev =>
-      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
-    )
-  }
 
   async function onSubmit(data: ClientFormData) {
     if (!user) return
@@ -81,6 +98,7 @@ export default function NewClient() {
         num_dependents: data.numDependents,
         client_code:    data.clientCode ? data.clientCode.toUpperCase() : null,
         notes:          data.notes || null,
+        assignees:      selectedAssignees,
         created_by:     user.id,
       }, { onConflict: 'company_name,created_by' })
       .select('id')
@@ -90,17 +108,6 @@ export default function NewClient() {
       setError(insertError.message)
       setSaving(false)
       return
-    }
-
-    // Insert staff assignments
-    if (selectedStaff.length > 0 && client) {
-      await supabase.from('client_assignments').insert(
-        selectedStaff.map(userId => ({
-          client_id:   client.id,
-          user_id:     userId,
-          assigned_by: user.id,
-        }))
-      )
     }
 
     toast('Client saved')
@@ -203,40 +210,93 @@ export default function NewClient() {
           </div>
 
           {/* Staff Assignment */}
-          {profiles.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Assign to Staff
-                <span className="text-xs font-normal text-slate-400 ml-2">Optional — can also be set later</span>
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {profiles.map(p => {
-                  const selected = selectedStaff.includes(p.id)
-                  const isMe = p.id === user?.id
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => toggleStaff(p.id)}
-                      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                        selected
-                          ? 'bg-orange-600 border-orange-600 text-white'
-                          : 'bg-white border-slate-300 text-slate-700 hover:border-orange-400 hover:text-orange-600'
-                      }`}
-                    >
-                      <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-bold ${
-                        selected ? 'bg-orange-500 text-white' : 'bg-slate-200 text-slate-600'
-                      }`}>
-                        {initials(p)}
-                      </span>
-                      {displayName(p)}
-                      {isMe && <span className="opacity-60 text-xs">(me)</span>}
-                    </button>
-                  )
-                })}
-              </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Assign to Staff
+              <span className="text-xs font-normal text-slate-400 ml-2">Optional — can also be set later</span>
+            </label>
+            <div ref={assigneeContainerRef} className="flex items-start gap-3 flex-wrap">
+              {ASSIGNEE_GROUPS.map(group => {
+                const leadActive = selectedAssignees.includes(group.lead)
+                const activeMembers = group.members.filter(m => selectedAssignees.includes(m))
+                const isOpen = expandedGroups[group.lead] ?? false
+
+                return (
+                  <div key={group.lead} className="flex flex-col gap-1.5">
+                    {/* Lead chip + chevron */}
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        type="button"
+                        onClick={() => toggleAssignee(group.lead)}
+                        className={`inline-flex items-center gap-1.5 rounded-l-full pl-1.5 pr-2.5 py-1 text-xs font-semibold transition-colors ${
+                          leadActive
+                            ? 'bg-orange-500 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0 ${
+                          leadActive ? 'bg-orange-400 text-white' : 'bg-slate-300 text-slate-600'
+                        }`}>
+                          {assigneeInitials(group.lead)}
+                        </span>
+                        {group.lead}
+                        {!isOpen && activeMembers.length > 0 && (
+                          <span className="ml-0.5 bg-orange-300 text-orange-900 rounded-full text-[9px] font-bold px-1">
+                            +{activeMembers.length}
+                          </span>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedGroups(prev => ({ ...prev, [group.lead]: !isOpen }))}
+                        title={isOpen ? 'Collapse' : `Expand ${group.lead}'s team`}
+                        className={`rounded-r-full px-1.5 py-1 transition-colors border-l ${
+                          leadActive
+                            ? 'bg-orange-500 text-orange-100 border-orange-400 hover:bg-orange-600'
+                            : 'bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200'
+                        }`}
+                      >
+                        <svg
+                          className={`w-3 h-3 transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`}
+                          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    {/* Sub-members — stacked vertically */}
+                    {isOpen && (
+                      <div className="flex flex-col gap-1 ml-2">
+                        {group.members.map(name => {
+                          const active = selectedAssignees.includes(name)
+                          return (
+                            <button
+                              key={name}
+                              type="button"
+                              onClick={() => toggleAssignee(name)}
+                              className={`inline-flex items-center gap-1.5 rounded-full pl-1 pr-2.5 py-0.5 text-xs font-medium transition-colors ${
+                                active
+                                  ? 'bg-orange-400 text-white'
+                                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                              }`}
+                            >
+                              <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold flex-shrink-0 ${
+                                active ? 'bg-orange-300 text-white' : 'bg-slate-200 text-slate-500'
+                              }`}>
+                                {assigneeInitials(name)}
+                              </span>
+                              {name}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
-          )}
+          </div>
 
           {error && (
             <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
