@@ -8,12 +8,20 @@ export function useClients() {
 
   const fetchClients = useCallback(async () => {
     setLoading(true)
+
+    // Try with assignments join; fall back to plain select if migration hasn't run yet
     const { data, error } = await supabase
       .from('clients')
       .select('*, client_assignments(user_id, assigned_at, profiles(full_name, email))')
 
-    if (error) setError(error.message)
-    else setClients(data ?? [])
+    if (error) {
+      const fallback = await supabase.from('clients').select('*')
+      if (fallback.error) setError(fallback.error.message)
+      else setClients((fallback.data ?? []) as DbClient[])
+    } else {
+      setClients((data ?? []) as unknown as DbClient[])
+    }
+
     setLoading(false)
   }, [])
 

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { useAuth } from '@/hooks/useAuth'
+import { useProfiles } from '@/hooks/useProfiles'
 import { supabase } from '@/lib/supabase'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -24,12 +25,24 @@ interface ClientFormData {
   notes: string
 }
 
+function displayName(profile: { full_name: string; email: string }): string {
+  return profile.full_name?.trim() || profile.email?.split('@')[0] || 'Unknown'
+}
+
+function initials(profile: { full_name: string; email: string }): string {
+  const name = displayName(profile)
+  const parts = name.split(' ')
+  return (parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : name.slice(0, 2)).toUpperCase()
+}
+
 export default function NewClient() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
+  const { profiles } = useProfiles()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [selectedStaff, setSelectedStaff] = useState<string[]>([])
 
   const { register, handleSubmit, formState: { errors } } = useForm<ClientFormData>({
     defaultValues: {
@@ -44,6 +57,12 @@ export default function NewClient() {
       notes: '',
     },
   })
+
+  function toggleStaff(userId: string) {
+    setSelectedStaff(prev =>
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    )
+  }
 
   async function onSubmit(data: ClientFormData) {
     if (!user) return
@@ -73,8 +92,19 @@ export default function NewClient() {
       return
     }
 
+    // Insert staff assignments
+    if (selectedStaff.length > 0 && client) {
+      await supabase.from('client_assignments').insert(
+        selectedStaff.map(userId => ({
+          client_id:   client.id,
+          user_id:     userId,
+          assigned_by: user.id,
+        }))
+      )
+    }
+
     toast('Client saved')
-    navigate(`/clients/${client.id}`)
+    navigate(`/clients/${client!.id}`)
   }
 
   return (
@@ -111,20 +141,19 @@ export default function NewClient() {
             <Input
               label="Client Code"
               placeholder="e.g., GBG"
-              hint="2–4 letter shortcode for bulk upload matching"
-              maxLength={4}
+              hint="2–6 letter code for bulk upload matching"
+              maxLength={6}
               style={{ textTransform: 'uppercase' }}
               error={errors.clientCode?.message}
               {...register('clientCode', {
                 pattern: {
-                  value: /^[A-Za-z]{0,4}$/,
-                  message: '2–4 letters only',
+                  value: /^[A-Za-z]{0,6}$/,
+                  message: '2–6 letters only',
                 },
-                validate: v => !v || v.length >= 2 || 'Must be 2–4 letters',
+                validate: v => !v || v.length >= 2 || 'Must be 2–6 letters',
               })}
             />
           </div>
-
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select
@@ -172,6 +201,42 @@ export default function NewClient() {
               {...register('notes')}
             />
           </div>
+
+          {/* Staff Assignment */}
+          {profiles.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Assign to Staff
+                <span className="text-xs font-normal text-slate-400 ml-2">Optional — can also be set later</span>
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {profiles.map(p => {
+                  const selected = selectedStaff.includes(p.id)
+                  const isMe = p.id === user?.id
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => toggleStaff(p.id)}
+                      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                        selected
+                          ? 'bg-orange-600 border-orange-600 text-white'
+                          : 'bg-white border-slate-300 text-slate-700 hover:border-orange-400 hover:text-orange-600'
+                      }`}
+                    >
+                      <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-bold ${
+                        selected ? 'bg-orange-500 text-white' : 'bg-slate-200 text-slate-600'
+                      }`}>
+                        {initials(p)}
+                      </span>
+                      {displayName(p)}
+                      {isMe && <span className="opacity-60 text-xs">(me)</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {error && (
             <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
