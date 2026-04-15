@@ -1,11 +1,10 @@
-import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useReports } from '@/hooks/useReports'
 import { useClients } from '@/hooks/useClients'
 import { useDocuments } from '@/hooks/useDocuments'
 import { useAuth } from '@/hooks/useAuth'
-import { useProfiles } from '@/hooks/useProfiles'
-import { useClientAssignments } from '@/hooks/useClientAssignments'
+import { ASSIGNEE_GROUPS, assigneeInitials } from '@/lib/assignees'
 import { supabase } from '@/lib/supabase'
 import { getDocumentUrl, uploadDocument } from '@/lib/storage'
 import { detectDocumentType } from '@/lib/detectFileType'
@@ -453,25 +452,23 @@ function DocumentsPanel({ clientId, taxYear }: { clientId: string; taxYear: numb
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { user } = useAuth()
   const { clients, refetch: refreshClients } = useClients()
   const { reports, loading, deleteReport } = useReports(id)
   const { toast } = useToast()
-  const { profiles } = useProfiles()
-  const { assignments, addAssignment, removeAssignment } = useClientAssignments(id)
-  const [showAssignPicker, setShowAssignPicker] = useState(false)
-  const assignPickerRef = useRef<HTMLDivElement>(null)
 
-  // Close picker when clicking outside
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (assignPickerRef.current && !assignPickerRef.current.contains(e.target as Node)) {
-        setShowAssignPicker(false)
-      }
-    }
-    if (showAssignPicker) document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [showAssignPicker])
+  async function toggleAssignee(name: string) {
+    if (!client) return
+    const current = client.assignees ?? []
+    const next = current.includes(name)
+      ? current.filter(n => n !== name)
+      : [...current, name]
+    const { error } = await supabase
+      .from('clients')
+      .update({ assignees: next })
+      .eq('id', client.id)
+    if (error) toast('Could not update assignment', 'error')
+    else await refreshClients()
+  }
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [confirmDeleteClient, setConfirmDeleteClient] = useState(false)
   const [notes, setNotes] = useState<string | null>(null)
@@ -628,68 +625,42 @@ export default function ClientDetail() {
       </div>
 
       {/* Staff Assignments */}
-      <div className="flex items-center gap-2 flex-wrap mb-6">
-        <span className="text-xs text-slate-400 font-medium">Assigned to:</span>
-        {assignments.length === 0 && (
-          <span className="text-xs text-slate-400 italic">Unassigned</span>
-        )}
-        {assignments.map(a => {
-          // Resolve name from profiles list (no join needed)
-          const profile = profiles.find(p => p.id === a.user_id)
-          const name = profile?.full_name?.trim() || profile?.email?.split('@')[0] || 'User'
-          const ini = name.split(' ').map((p: string) => p[0]).slice(0, 2).join('').toUpperCase()
-          return (
-            <span key={a.user_id} className="inline-flex items-center gap-1 bg-slate-100 rounded-full px-2.5 py-1 text-xs font-medium text-slate-700">
-              <span className="w-4 h-4 rounded-full bg-orange-500 text-white flex items-center justify-center text-[9px] font-bold">{ini}</span>
-              {name}
-              <button
-                onClick={() => removeAssignment(a.user_id)}
-                className="ml-0.5 text-slate-400 hover:text-red-500 transition-colors"
-                title={`Remove ${name}`}
-              >
-                ×
-              </button>
-            </span>
-          )
-        })}
-
-        {/* Add assignment picker */}
-        <div className="relative" ref={assignPickerRef}>
-          <button
-            onClick={() => setShowAssignPicker(v => !v)}
-            className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-orange-600 border border-dashed border-slate-300 hover:border-orange-400 rounded-full px-2.5 py-1 transition-colors"
-          >
-            + Assign
-          </button>
-          {showAssignPicker && (
-            <div className="absolute left-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-10 min-w-[180px] overflow-hidden">
-              {profiles
-                .filter(p => !assignments.some(a => a.user_id === p.id))
-                .map(p => {
-                  const name = p.full_name?.trim() || p.email?.split('@')[0] || 'User'
-                  const isMe = p.id === user?.id
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={async () => {
-                        const err = await addAssignment(p.id)
-                        if (err) { toast('Could not assign: ' + err.message, 'error'); return }
-                        setShowAssignPicker(false)
-                      }}
-                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 text-slate-700 flex items-center gap-2"
-                    >
-                      {name}
-                      {isMe && <span className="text-xs text-slate-400">(me)</span>}
-                    </button>
-                  )
-                })
-              }
-              {profiles.filter(p => !assignments.some(a => a.user_id === p.id)).length === 0 && (
-                <p className="px-4 py-2.5 text-xs text-slate-400">All users assigned</p>
-              )}
+      <div className="mb-6">
+        <p className="text-xs text-slate-400 font-medium mb-2">Assigned to:</p>
+        <div className="flex items-center gap-3 flex-wrap">
+          {ASSIGNEE_GROUPS.map(group => (
+            <div key={group.lead} className="flex items-center gap-1.5">
+              {/* Group label (non-clickable) */}
+              <span className="text-xs text-slate-400">{group.lead}:</span>
+              {/* Lead toggle */}
+              {[group.lead, ...group.members].map(name => {
+                const active = (client?.assignees ?? []).includes(name)
+                return (
+                  <button
+                    key={name}
+                    onClick={() => toggleAssignee(name)}
+                    title={active ? `Remove ${name}` : `Assign ${name}`}
+                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                      active
+                        ? 'bg-orange-500 text-white'
+                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                    }`}
+                  >
+                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                      active ? 'bg-orange-400 text-white' : 'bg-slate-300 text-slate-600'
+                    }`}>
+                      {assigneeInitials(name)}
+                    </span>
+                    {name}
+                  </button>
+                )
+              })}
             </div>
-          )}
+          ))}
         </div>
+        {(client?.assignees ?? []).length === 0 && (
+          <p className="text-xs text-slate-400 italic mt-1.5">No one assigned — click a name above to assign.</p>
+        )}
       </div>
 
       {/* Edit Client Panel */}

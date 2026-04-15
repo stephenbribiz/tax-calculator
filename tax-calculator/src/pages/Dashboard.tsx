@@ -2,12 +2,10 @@ import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useClients } from '@/hooks/useClients'
 import { useReports } from '@/hooks/useReports'
-import { useProfiles } from '@/hooks/useProfiles'
-import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { UserFilter } from '@/components/ui/UserFilter'
+import { AssigneeFilter } from '@/components/ui/AssigneeFilter'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { formatOwnerName } from '@/pages/ClientList'
 import type { TaxOutput } from '@/types'
@@ -36,10 +34,8 @@ function getPreviousQuarter(): { quarter: string; year: number } {
 export default function Dashboard() {
   const { clients, loading: clientsLoading } = useClients()
   const { reports, loading: reportsLoading } = useReports()
-  const { profiles } = useProfiles()
-  const { user } = useAuth()
   const [clientSearch, setClientSearch] = useState('')
-  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
 
   const { quarter: currentQuarter, year: currentYear } = getPreviousQuarter()
 
@@ -58,21 +54,19 @@ export default function Dashboard() {
       const q = clientSearch.toLowerCase()
       if (!c.owner_name.toLowerCase().includes(q) && !c.company_name.toLowerCase().includes(q)) return false
     }
-    if (selectedUsers.length > 0) {
-      const assignedIds = (c.client_assignments ?? []).map(a => a.user_id)
-      return selectedUsers.some(uid => assignedIds.includes(uid))
+    if (selectedAssignees.length > 0) {
+      return selectedAssignees.some(name => (c.assignees ?? []).includes(name))
     }
     return true
   })
 
   const recentReports = useMemo(() => {
-    if (selectedUsers.length === 0) return reports.slice(0, 10)
+    if (selectedAssignees.length === 0) return reports.slice(0, 10)
     return reports.filter(r => {
       const client = clients.find(c => c.id === r.client_id)
-      const ids = (client?.client_assignments ?? []).map(a => a.user_id)
-      return selectedUsers.some(uid => ids.includes(uid))
+      return selectedAssignees.some(name => (client?.assignees ?? []).includes(name))
     }).slice(0, 10)
-  }, [reports, clients, selectedUsers])
+  }, [reports, clients, selectedAssignees])
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -129,17 +123,13 @@ export default function Dashboard() {
             placeholder="Search clients..."
             className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
           />
-          {profiles.length > 0 && (
-            <div className="mb-3">
-              <UserFilter
-                profiles={profiles}
-                selected={selectedUsers}
-                onToggle={uid => setSelectedUsers(prev => prev.includes(uid) ? prev.filter(id => id !== uid) : [...prev, uid])}
-                onClear={() => setSelectedUsers([])}
-                currentUserId={user?.id}
-              />
-            </div>
-          )}
+          <div className="mb-3">
+            <AssigneeFilter
+              selected={selectedAssignees}
+              onToggle={name => setSelectedAssignees(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name])}
+              onClear={() => setSelectedAssignees([])}
+            />
+          </div>
           <div className="space-y-2">
             {clientsLoading
               ? Array.from({ length: 4 }).map((_, i) => (

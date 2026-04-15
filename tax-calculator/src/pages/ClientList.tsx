@@ -1,10 +1,9 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useClients } from '@/hooks/useClients'
-import { useProfiles } from '@/hooks/useProfiles'
-import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/Button'
-import { UserFilter } from '@/components/ui/UserFilter'
+import { AssigneeFilter } from '@/components/ui/AssigneeFilter'
+import { assigneeInitials } from '@/lib/assignees'
 import type { DbClient } from '@/lib/supabase'
 
 type SortField = 'owner' | 'company'
@@ -76,29 +75,21 @@ function sortClients(clients: DbClient[], sortField: SortField): DbClient[] {
   })
 }
 
-function AssignedAvatars({ assignments, profiles }: {
-  assignments: import('@/lib/supabase').DbClientAssignment[]
-  profiles: import('@/lib/supabase').DbProfile[]
-}) {
-  if (assignments.length === 0) return <span className="text-xs text-slate-300">—</span>
+function AssignedAvatars({ assignees }: { assignees: string[] }) {
+  if (assignees.length === 0) return <span className="text-xs text-slate-300">—</span>
   return (
     <div className="flex items-center gap-1">
-      {assignments.slice(0, 3).map(a => {
-        const p = profiles.find(pr => pr.id === a.user_id)
-        const name = p?.full_name?.trim() || p?.email?.split('@')[0] || '?'
-        const initials = name.split(' ').map((p: string) => p[0]).slice(0, 2).join('').toUpperCase()
-        return (
-          <span
-            key={a.user_id}
-            title={name}
-            className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-orange-100 text-orange-700 text-[9px] font-bold border border-white ring-1 ring-orange-200"
-          >
-            {initials}
-          </span>
-        )
-      })}
-      {assignments.length > 3 && (
-        <span className="text-xs text-slate-400">+{assignments.length - 3}</span>
+      {assignees.slice(0, 4).map(name => (
+        <span
+          key={name}
+          title={name}
+          className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-orange-100 text-orange-700 text-[9px] font-bold border border-white ring-1 ring-orange-200"
+        >
+          {assigneeInitials(name)}
+        </span>
+      ))}
+      {assignees.length > 4 && (
+        <span className="text-xs text-slate-400">+{assignees.length - 4}</span>
       )}
     </div>
   )
@@ -106,19 +97,17 @@ function AssignedAvatars({ assignments, profiles }: {
 
 export default function ClientList() {
   const { clients, loading } = useClients()
-  const { profiles } = useProfiles()
-  const { user } = useAuth()
   const [search, setSearch] = useState('')
   const [sortField, setSortField] = useState<SortField>('owner')
-  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
 
   function toggleSort(field: SortField) {
     setSortField(field)
   }
 
-  function toggleUserFilter(userId: string) {
-    setSelectedUsers(prev =>
-      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+  function toggleAssignee(name: string) {
+    setSelectedAssignees(prev =>
+      prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
     )
   }
 
@@ -135,10 +124,10 @@ export default function ClientList() {
       )
       if (!matchesText) return false
     }
-    // User filter
-    if (selectedUsers.length > 0) {
-      const assignedIds = (c.client_assignments ?? []).map(a => a.user_id)
-      return selectedUsers.some(uid => assignedIds.includes(uid))
+    // Assignee filter — show client if any of its assignees are selected
+    if (selectedAssignees.length > 0) {
+      const clientAssignees = c.assignees ?? []
+      return selectedAssignees.some(name => clientAssignees.includes(name))
     }
     return true
   })
@@ -159,17 +148,13 @@ export default function ClientList() {
         placeholder="Search by name, company, or code..."
         className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
       />
-      {profiles.length > 0 && (
-        <div className="mb-4">
-          <UserFilter
-            profiles={profiles}
-            selected={selectedUsers}
-            onToggle={toggleUserFilter}
-            onClear={() => setSelectedUsers([])}
-            currentUserId={user?.id}
-          />
-        </div>
-      )}
+      <div className="mb-4">
+        <AssigneeFilter
+          selected={selectedAssignees}
+          onToggle={toggleAssignee}
+          onClear={() => setSelectedAssignees([])}
+        />
+      </div>
 
       {loading
         ? <p className="text-sm text-slate-400">Loading…</p>
@@ -240,7 +225,7 @@ export default function ClientList() {
                       <td className="px-5 py-3 text-slate-500">{client.state}</td>
                       <td className="px-5 py-3 text-slate-500">{client.filing_status}</td>
                       <td className="px-5 py-3">
-                        <AssignedAvatars assignments={client.client_assignments ?? []} profiles={profiles} />
+                        <AssignedAvatars assignees={client.assignees ?? []} />
                       </td>
                     </tr>
                   ))
