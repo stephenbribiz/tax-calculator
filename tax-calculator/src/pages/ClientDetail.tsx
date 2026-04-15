@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useEffect } from 'react'
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useReports } from '@/hooks/useReports'
 import { useClients } from '@/hooks/useClients'
@@ -510,6 +510,18 @@ export default function ClientDetail() {
     }
   }, [client?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Collapse all groups when clicking outside the assignment container
+  const assigneeContainerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (assigneeContainerRef.current && !assigneeContainerRef.current.contains(e.target as Node)) {
+        setExpandedGroups({ Stephen: false, Brian: false })
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   async function toggleAssignee(name: string) {
     if (!client) return
     const current = client.assignees ?? []
@@ -660,7 +672,7 @@ export default function ClientDetail() {
       {/* Staff Assignments */}
       <div className="mb-6">
         <p className="text-xs text-slate-400 font-medium mb-2">Assigned to:</p>
-        <div className="flex items-center gap-3 flex-wrap">
+        <div ref={assigneeContainerRef} className="flex items-start gap-3 flex-wrap">
           {ASSIGNEE_GROUPS.map(group => {
             const assignees = client?.assignees ?? []
             const leadActive = assignees.includes(group.lead)
@@ -712,9 +724,9 @@ export default function ClientDetail() {
                   </button>
                 </div>
 
-                {/* Sub-members (when expanded) */}
+                {/* Sub-members (when expanded) — stacked vertically */}
                 {isOpen && (
-                  <div className="flex items-center gap-1 ml-2 flex-wrap">
+                  <div className="flex flex-col gap-1 ml-2">
                     {group.members.map(name => {
                       const active = assignees.includes(name)
                       return (
