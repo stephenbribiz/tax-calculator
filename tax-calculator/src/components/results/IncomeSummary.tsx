@@ -31,12 +31,34 @@ export function IncomeSummary({ input, output }: Props) {
 
       {/* Rows */}
       <div className="px-6 pb-2">
-        <Row label="Business Net Income" value={formatCurrency(input.businessNetIncome)} />
-        {input.ownershipPct < 100 && (
-          <Row
-            label={`Allocated to Owner (${input.ownershipPct}%)`}
-            value={formatCurrency(output.allocatedBusinessIncome)}
-          />
+        {input.companyType === 'S-Corp' && input.shareholderSalary > 0 ? (
+          // S-Corp breakdown: K-1 income + shareholder salary = effective income
+          <>
+            <Row
+              label={input.ownershipPct < 100 ? `K-1 Income (${input.ownershipPct}% share)` : 'K-1 Pass-Through Income'}
+              value={formatCurrency(output.allocatedBusinessIncome)}
+            />
+            <Row
+              label="+ Shareholder Salary (W-2)"
+              value={formatCurrency(input.shareholderSalary)}
+            />
+            <div className="flex justify-between items-center py-2 border-t border-slate-100 mt-0.5">
+              <span className="text-sm font-semibold text-slate-700">Effective S-Corp Income</span>
+              <span className="text-sm font-semibold text-slate-900 tabular-nums">
+                {formatCurrency(Math.max(0, output.allocatedBusinessIncome + input.shareholderSalary))}
+              </span>
+            </div>
+          </>
+        ) : (
+          <>
+            <Row label="Business Net Income" value={formatCurrency(input.businessNetIncome)} />
+            {input.ownershipPct < 100 && (
+              <Row
+                label={`Allocated to Owner (${input.ownershipPct}%)`}
+                value={formatCurrency(output.allocatedBusinessIncome)}
+              />
+            )}
+          </>
         )}
 
         {/* Adjustments — show only what applies */}

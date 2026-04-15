@@ -43,6 +43,10 @@ export async function extractTextFromPDF(file: File): Promise<string> {
           .sort((a, b) => a.x - b.x)
           .map(i => i.text)
           .join('\t')
+          // Strip page-number footers (e.g. "Page 3 of 3") — they can end up
+          // on the same extracted line as the last data row (same Y coordinate)
+          // and cause findYTDAmount to pick up "3" instead of the actual amount.
+          .replace(/\bPage\s+\d+\s+of\s+\d+\b/gi, '')
           .trim()
       )
       .filter(line => line.length > 0)

@@ -18,8 +18,17 @@ export function calculateTax(input: TaxInput): TaxOutput {
   const taxData = getTaxDataByYear(input.taxYear)
   const proration = PRORATION_MAP[input.quarter]
 
-  // 1. Actual (non-annualized) allocated income — used for SE tax and display
+  // 1. Actual (non-annualized) allocated income — K-1 pass-through, used for SE tax and display
   const actualAllocatedIncome = input.businessNetIncome * (input.ownershipPct / 100)
+
+  // For S-Corp: the shareholder is taxed on BOTH their K-1 pass-through income AND their W-2
+  // salary. The salary is already deducted as an S-Corp business expense (which reduces the K-1),
+  // so we add it back to get the full income tax base. A K-1 net loss can offset salary income,
+  // but the combined effective income floors at $0.
+  const isSCorp = input.companyType === 'S-Corp'
+  const effectiveAllocatedIncome = isSCorp
+    ? Math.max(0, actualAllocatedIncome + input.shareholderSalary)
+    : actualAllocatedIncome
 
   // 2. Annualized income — only for bracket determination when annualizeIncome is on
   const isAnnualizing = input.annualizeIncome && proration > 0 && proration < 1
@@ -30,7 +39,7 @@ export function calculateTax(input: TaxInput): TaxOutput {
   // 3. Meal add-back (50% non-deductible)
   const mealAddBack = input.mealExpense * 0.5
 
-  // 4. SE tax always on actual income
+  // 4. SE tax always on actual K-1 income (S-Corp SE tax = $0; salary uses FICA instead)
   const seNetIncome = Math.max(0, actualAllocatedIncome + mealAddBack)
   const seTaxResult = calculateSETax(seNetIncome, input.taxYear, input.companyType)
 
@@ -43,7 +52,8 @@ export function calculateTax(input: TaxInput): TaxOutput {
   const proratedDeduction = fullDeduction * proration
 
   // 7. AGI and taxable income (actual — for display and non-annualized calc)
-  const totalAGI = actualAllocatedIncome
+  // For S-Corp: use effectiveAllocatedIncome (K-1 + salary, floored at 0) as the income base
+  const totalAGI = effectiveAllocatedIncome
     + input.otherIncome
     + input.spousalIncome
     + mealAddBack
@@ -53,7 +63,7 @@ export function calculateTax(input: TaxInput): TaxOutput {
 
   // 8. Business-only income
   const businessAdjustedIncome = Math.max(0,
-    actualAllocatedIncome + mealAddBack - seTaxResult.deductibleHalf
+    effectiveAllocatedIncome + mealAddBack - seTaxResult.deductibleHalf
   )
   const businessTaxableIncome = Math.max(0, businessAdjustedIncome - proratedDeduction)
 
@@ -87,9 +97,15 @@ export function calculateTax(input: TaxInput): TaxOutput {
     const annSENet = Math.max(0, annAllocated + mealAddBack)
     const annSETax = calculateSETax(annSENet, input.taxYear, input.companyType)
 
-    const annAGI = annAllocated + input.otherIncome + input.spousalIncome + mealAddBack - annSETax.deductibleHalf
+    // For S-Corp: annualize salary the same way as K-1 income, then combine
+    const annSalary = isSCorp ? input.shareholderSalary / proration : 0
+    const effectiveAnnAllocated = isSCorp
+      ? Math.max(0, annAllocated + annSalary)
+      : annAllocated
+
+    const annAGI = effectiveAnnAllocated + input.otherIncome + input.spousalIncome + mealAddBack - annSETax.deductibleHalf
     const annTaxable = Math.max(0, annAGI - fullDeduction)
-    const annBusinessAdj = Math.max(0, annAllocated + mealAddBack - annSETax.deductibleHalf)
+    const annBusinessAdj = Math.max(0, effectiveAnnAllocated + mealAddBack - annSETax.deductibleHalf)
     const annBusinessTaxable = Math.max(0, annBusinessAdj - fullDeduction)
 
     const annQBI = calculateQBI(annBusinessAdj, annTaxable, input.filingStatus, taxData)
