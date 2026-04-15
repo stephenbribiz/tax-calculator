@@ -2,9 +2,12 @@ import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useClients } from '@/hooks/useClients'
 import { useReports } from '@/hooks/useReports'
+import { useProfiles } from '@/hooks/useProfiles'
+import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { UserFilter } from '@/components/ui/UserFilter'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { formatOwnerName } from '@/pages/ClientList'
 import type { TaxOutput } from '@/types'
@@ -33,7 +36,10 @@ function getPreviousQuarter(): { quarter: string; year: number } {
 export default function Dashboard() {
   const { clients, loading: clientsLoading } = useClients()
   const { reports, loading: reportsLoading } = useReports()
+  const { profiles } = useProfiles()
+  const { user } = useAuth()
   const [clientSearch, setClientSearch] = useState('')
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
 
   const { quarter: currentQuarter, year: currentYear } = getPreviousQuarter()
 
@@ -48,9 +54,15 @@ export default function Dashboard() {
   )
 
   const filteredClients = clients.filter(c => {
-    if (!clientSearch) return true
-    const q = clientSearch.toLowerCase()
-    return c.owner_name.toLowerCase().includes(q) || c.company_name.toLowerCase().includes(q)
+    if (clientSearch) {
+      const q = clientSearch.toLowerCase()
+      if (!c.owner_name.toLowerCase().includes(q) && !c.company_name.toLowerCase().includes(q)) return false
+    }
+    if (selectedUsers.length > 0) {
+      const assignedIds = (c.client_assignments ?? []).map(a => a.user_id)
+      return selectedUsers.some(uid => assignedIds.includes(uid))
+    }
+    return true
   })
 
   const recentReports = reports.slice(0, 10)
@@ -108,8 +120,19 @@ export default function Dashboard() {
             value={clientSearch}
             onChange={e => setClientSearch(e.target.value)}
             placeholder="Search clients..."
-            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
           />
+          {profiles.length > 0 && (
+            <div className="mb-3">
+              <UserFilter
+                profiles={profiles}
+                selected={selectedUsers}
+                onToggle={uid => setSelectedUsers(prev => prev.includes(uid) ? prev.filter(id => id !== uid) : [...prev, uid])}
+                onClear={() => setSelectedUsers([])}
+                currentUserId={user?.id}
+              />
+            </div>
+          )}
           <div className="space-y-2">
             {clientsLoading
               ? Array.from({ length: 4 }).map((_, i) => (

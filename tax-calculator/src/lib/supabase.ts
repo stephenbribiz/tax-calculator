@@ -27,6 +27,12 @@ export interface DbProfile {
   updated_at: string
 }
 
+export interface DbClientAssignment {
+  user_id: string
+  assigned_at: string
+  profiles: { full_name: string; email: string } | null
+}
+
 export interface DbClient {
   id: string
   created_at: string
@@ -41,6 +47,8 @@ export interface DbClient {
   num_dependents: number
   notes: string | null
   client_code: string | null
+  // Populated when queried with join
+  client_assignments?: DbClientAssignment[]
 }
 
 export interface DbReport {

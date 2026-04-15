@@ -1,7 +1,10 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useClients } from '@/hooks/useClients'
+import { useProfiles } from '@/hooks/useProfiles'
+import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/Button'
+import { UserFilter } from '@/components/ui/UserFilter'
 import type { DbClient } from '@/lib/supabase'
 
 type SortField = 'owner' | 'company'
@@ -73,25 +76,67 @@ function sortClients(clients: DbClient[], sortField: SortField): DbClient[] {
   })
 }
 
+function AssignedAvatars({ assignments }: { assignments: import('@/lib/supabase').DbClientAssignment[] }) {
+  if (assignments.length === 0) return <span className="text-xs text-slate-300">—</span>
+  return (
+    <div className="flex items-center gap-1">
+      {assignments.slice(0, 3).map(a => {
+        const name = a.profiles?.full_name?.trim() || a.profiles?.email?.split('@')[0] || '?'
+        const initials = name.split(' ').map((p: string) => p[0]).slice(0, 2).join('').toUpperCase()
+        return (
+          <span
+            key={a.user_id}
+            title={name}
+            className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-orange-100 text-orange-700 text-[9px] font-bold border border-white ring-1 ring-orange-200"
+          >
+            {initials}
+          </span>
+        )
+      })}
+      {assignments.length > 3 && (
+        <span className="text-xs text-slate-400">+{assignments.length - 3}</span>
+      )}
+    </div>
+  )
+}
+
 export default function ClientList() {
   const { clients, loading } = useClients()
+  const { profiles } = useProfiles()
+  const { user } = useAuth()
   const [search, setSearch] = useState('')
   const [sortField, setSortField] = useState<SortField>('owner')
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
 
   function toggleSort(field: SortField) {
     setSortField(field)
   }
 
+  function toggleUserFilter(userId: string) {
+    setSelectedUsers(prev =>
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    )
+  }
+
   const sortedClients = useMemo(() => sortClients(clients, sortField), [clients, sortField])
 
   const filteredClients = sortedClients.filter(c => {
-    if (!search) return true
-    const q = search.toLowerCase()
-    return (
-      c.owner_name.toLowerCase().includes(q) ||
-      c.company_name.toLowerCase().includes(q) ||
-      (c.client_code ?? '').toLowerCase().includes(q)
-    )
+    // Text search
+    if (search) {
+      const q = search.toLowerCase()
+      const matchesText = (
+        c.owner_name.toLowerCase().includes(q) ||
+        c.company_name.toLowerCase().includes(q) ||
+        (c.client_code ?? '').toLowerCase().includes(q)
+      )
+      if (!matchesText) return false
+    }
+    // User filter
+    if (selectedUsers.length > 0) {
+      const assignedIds = (c.client_assignments ?? []).map(a => a.user_id)
+      return selectedUsers.some(uid => assignedIds.includes(uid))
+    }
+    return true
   })
 
   return (
@@ -108,8 +153,19 @@ export default function ClientList() {
         value={search}
         onChange={e => setSearch(e.target.value)}
         placeholder="Search by name, company, or code..."
-        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
       />
+      {profiles.length > 0 && (
+        <div className="mb-4">
+          <UserFilter
+            profiles={profiles}
+            selected={selectedUsers}
+            onToggle={toggleUserFilter}
+            onClear={() => setSelectedUsers([])}
+            currentUserId={user?.id}
+          />
+        </div>
+      )}
 
       {loading
         ? <p className="text-sm text-slate-400">Loading…</p>
@@ -150,13 +206,14 @@ export default function ClientList() {
                   <th className="text-left text-xs font-semibold text-slate-500 px-5 py-3">Type</th>
                   <th className="text-left text-xs font-semibold text-slate-500 px-5 py-3">State</th>
                   <th className="text-left text-xs font-semibold text-slate-500 px-5 py-3">Filing Status</th>
+                  <th className="text-left text-xs font-semibold text-slate-500 px-5 py-3">Assigned</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredClients.length === 0
                   ? (
                     <tr>
-                      <td colSpan={6} className="text-center text-slate-400 py-8">
+                      <td colSpan={7} className="text-center text-slate-400 py-8">
                         {clients.length === 0
                           ? <>No clients yet. <Link to="/clients/new" className="text-orange-600 hover:underline">Add your first client →</Link></>
                           : 'No clients match your search.'
@@ -178,6 +235,9 @@ export default function ClientList() {
                       <td className="px-5 py-3 text-slate-500">{client.company_type}</td>
                       <td className="px-5 py-3 text-slate-500">{client.state}</td>
                       <td className="px-5 py-3 text-slate-500">{client.filing_status}</td>
+                      <td className="px-5 py-3">
+                        <AssignedAvatars assignments={client.client_assignments ?? []} />
+                      </td>
                     </tr>
                   ))
                 }

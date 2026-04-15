@@ -83,3 +83,54 @@ create policy "reports_update" on public.reports
 
 create policy "reports_delete" on public.reports
   for delete using (auth.uid() = created_by);
+
+-- ============================================================
+-- CLIENT ASSIGNMENTS (staff assignment, many-to-many)
+-- Run this migration after the base schema above.
+-- ============================================================
+
+-- 1. Create the junction table
+create table if not exists public.client_assignments (
+  client_id    uuid not null references public.clients(id) on delete cascade,
+  user_id      uuid not null references auth.users(id) on delete cascade,
+  assigned_at  timestamptz not null default now(),
+  assigned_by  uuid references auth.users(id),
+  primary key (client_id, user_id)
+);
+
+create index if not exists client_assignments_user_id
+  on public.client_assignments (user_id);
+
+alter table public.client_assignments enable row level security;
+
+-- Any authenticated user can read assignments (to show the filter UI)
+create policy "assignments_select" on public.client_assignments
+  for select using (auth.role() = 'authenticated');
+
+-- Only the client owner can add/remove assignments
+create policy "assignments_insert" on public.client_assignments
+  for insert with check (
+    exists (select 1 from public.clients where id = client_id and created_by = auth.uid())
+  );
+
+create policy "assignments_delete" on public.client_assignments
+  for delete using (
+    exists (select 1 from public.clients where id = client_id and created_by = auth.uid())
+  );
+
+-- 2. Update clients SELECT policy so assigned users can see their clients
+drop policy if exists "clients_select" on public.clients;
+create policy "clients_select" on public.clients
+  for select using (
+    auth.uid() = created_by
+    or exists (
+      select 1 from public.client_assignments
+      where client_id = id and user_id = auth.uid()
+    )
+  );
+
+-- 3. Allow all authenticated users to read profiles (for the assignment picker)
+-- (Drop any restrictive existing policy first)
+drop policy if exists "profiles_select" on public.profiles;
+create policy "profiles_select" on public.profiles
+  for select using (auth.role() = 'authenticated');
