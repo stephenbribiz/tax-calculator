@@ -292,6 +292,7 @@ export default function NewReport() {
           date_completed:  state.step2.dateCompleted,
           input_snapshot:  taxInput as unknown as Record<string, unknown>,
           output_snapshot: output as unknown as Record<string, unknown>,
+          is_final:        true,
         })
         .eq('id', editReportId)
 
@@ -344,6 +345,7 @@ export default function NewReport() {
         date_completed:  state.step2.dateCompleted,
         input_snapshot:  taxInput as unknown as Record<string, unknown>,
         output_snapshot: output as unknown as Record<string, unknown>,
+        is_final:        true,
       })
 
       if (reportError) { setSaveError(reportError.message); toast(reportError.message, 'error'); setSaving(false); return }
