@@ -18,11 +18,11 @@ interface Props {
   onPayrollAdj?: (adjustedSalary: number, confirmed: boolean) => void
   /** The raw form-state values (unaffected by gating) for SCorpAnalysis preview */
   payrollAdjState?: PayrollAdjState
-  /** Legacy: keep accepting old prop so ReportView doesn't break */
+  /** Legacy: accepted but unused — ReportView passes nothing here */
   onAdjustedSalaryChange?: (value: number) => void
 }
 
-export function ResultsPanel({ input, output, onPayrollAdj, payrollAdjState, onAdjustedSalaryChange }: Props) {
+export function ResultsPanel({ input, output, onPayrollAdj, payrollAdjState }: Props) {
   return (
     <div className="space-y-5">
       <TaxSummary input={input} output={output} />
