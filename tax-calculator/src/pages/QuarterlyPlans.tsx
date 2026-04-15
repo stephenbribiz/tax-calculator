@@ -2,9 +2,7 @@ import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useReports } from '@/hooks/useReports'
 import { useClients } from '@/hooks/useClients'
-import { useProfiles } from '@/hooks/useProfiles'
-import { useAuth } from '@/hooks/useAuth'
-import { UserFilter } from '@/components/ui/UserFilter'
+import { AssigneeFilter } from '@/components/ui/AssigneeFilter'
 import { formatCurrency } from '@/lib/utils'
 import { formatOwnerName } from '@/pages/ClientList'
 import type { TaxOutput, TaxInput } from '@/types'
@@ -33,12 +31,9 @@ export default function QuarterlyPlans() {
   const currentYear = new Date().getFullYear()
   const { reports, loading: reportsLoading } = useReports()
   const { clients } = useClients()
-  const { profiles } = useProfiles()
-  const { user } = useAuth()
-
   const [year, setYear] = useState(currentYear)
   const [quarter, setQuarter] = useState<Quarter>('Q1')
-  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
   const [sortCol, setSortCol] = useState<SortCol>('client')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
@@ -51,10 +46,9 @@ export default function QuarterlyPlans() {
   const rows = useMemo<PlanRow[]>(() => {
     const filtered = reports.filter(r => {
       if (r.tax_year !== year || r.quarter !== quarter) return false
-      if (selectedUsers.length > 0) {
+      if (selectedAssignees.length > 0) {
         const client = clients.find(c => c.id === r.client_id)
-        const ids = (client?.client_assignments ?? []).map(a => a.user_id)
-        return selectedUsers.some(uid => ids.includes(uid))
+        return selectedAssignees.some(name => (client?.assignees ?? []).includes(name))
       }
       return true
     })
@@ -91,7 +85,7 @@ export default function QuarterlyPlans() {
       else if (sortCol === 'total') cmp = a.netDue - b.netDue
       return sortDir === 'asc' ? cmp : -cmp
     })
-  }, [reports, clients, year, quarter, selectedUsers, sortCol, sortDir])
+  }, [reports, clients, year, quarter, selectedAssignees, sortCol, sortDir])
 
   const totals = useMemo(() => rows.reduce(
     (acc, r) => ({
@@ -209,17 +203,13 @@ export default function QuarterlyPlans() {
         </div>
 
         {/* Staff filter */}
-        {profiles.length > 0 && (
-          <UserFilter
-            profiles={profiles}
-            selected={selectedUsers}
-            onToggle={uid => setSelectedUsers(prev =>
-              prev.includes(uid) ? prev.filter(id => id !== uid) : [...prev, uid]
-            )}
-            onClear={() => setSelectedUsers([])}
-            currentUserId={user?.id}
-          />
-        )}
+        <AssigneeFilter
+          selected={selectedAssignees}
+          onToggle={name => setSelectedAssignees(prev =>
+            prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
+          )}
+          onClear={() => setSelectedAssignees([])}
+        />
       </div>
 
       {/* Table */}
@@ -229,7 +219,7 @@ export default function QuarterlyPlans() {
         ) : rows.length === 0 ? (
           <div className="p-8 text-center text-sm text-slate-400">
             No tax plans found for {quarter} {year}.
-            {selectedUsers.length > 0 && ' Try clearing the staff filter.'}
+            {selectedAssignees.length > 0 && ' Try clearing the staff filter.'}
           </div>
         ) : (
           <>
