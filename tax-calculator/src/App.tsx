@@ -12,6 +12,7 @@ import NewClient from '@/pages/NewClient'
 import QuickCalculator from '@/pages/QuickCalculator'
 import AdminAuditLog from '@/pages/AdminAuditLog'
 import BulkUpload from '@/pages/BulkUpload'
+import QuarterlyPlans from '@/pages/QuarterlyPlans'
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -57,6 +58,7 @@ export default function App() {
         <Route path="/clients" element={<AuthGuard><ClientList /></AuthGuard>} />
         <Route path="/clients/new" element={<AuthGuard><NewClient /></AuthGuard>} />
         <Route path="/clients/:id" element={<AuthGuard><ClientDetail /></AuthGuard>} />
+        <Route path="/plans" element={<AuthGuard><QuarterlyPlans /></AuthGuard>} />
         <Route path="/upload" element={<AuthGuard><BulkUpload /></AuthGuard>} />
         <Route path="/calculator" element={<AuthGuard><QuickCalculator /></AuthGuard>} />
         <Route path="/admin" element={<AuthGuard><AdminAuditLog /></AuthGuard>} />

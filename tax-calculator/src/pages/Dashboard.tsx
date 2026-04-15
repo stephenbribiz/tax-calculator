@@ -65,7 +65,14 @@ export default function Dashboard() {
     return true
   })
 
-  const recentReports = reports.slice(0, 10)
+  const recentReports = useMemo(() => {
+    if (selectedUsers.length === 0) return reports.slice(0, 10)
+    return reports.filter(r => {
+      const client = clients.find(c => c.id === r.client_id)
+      const ids = (client?.client_assignments ?? []).map(a => a.user_id)
+      return selectedUsers.some(uid => ids.includes(uid))
+    }).slice(0, 10)
+  }, [reports, clients, selectedUsers])
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
