@@ -634,11 +634,13 @@ export default function ClientDetail() {
           <span className="text-xs text-slate-400 italic">Unassigned</span>
         )}
         {assignments.map(a => {
-          const name = a.profiles?.full_name?.trim() || a.profiles?.email?.split('@')[0] || 'User'
-          const initials = name.split(' ').map((p: string) => p[0]).slice(0, 2).join('').toUpperCase()
+          // Resolve name from profiles list (no join needed)
+          const profile = profiles.find(p => p.id === a.user_id)
+          const name = profile?.full_name?.trim() || profile?.email?.split('@')[0] || 'User'
+          const ini = name.split(' ').map((p: string) => p[0]).slice(0, 2).join('').toUpperCase()
           return (
             <span key={a.user_id} className="inline-flex items-center gap-1 bg-slate-100 rounded-full px-2.5 py-1 text-xs font-medium text-slate-700">
-              <span className="w-4 h-4 rounded-full bg-orange-500 text-white flex items-center justify-center text-[9px] font-bold">{initials}</span>
+              <span className="w-4 h-4 rounded-full bg-orange-500 text-white flex items-center justify-center text-[9px] font-bold">{ini}</span>
               {name}
               <button
                 onClick={() => removeAssignment(a.user_id)}
@@ -670,7 +672,8 @@ export default function ClientDetail() {
                     <button
                       key={p.id}
                       onClick={async () => {
-                        await addAssignment(p.id)
+                        const err = await addAssignment(p.id)
+                        if (err) { toast('Could not assign: ' + err.message, 'error'); return }
                         setShowAssignPicker(false)
                       }}
                       className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 text-slate-700 flex items-center gap-2"

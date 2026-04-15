@@ -11,9 +11,11 @@ export function useClientAssignments(clientId: string | undefined) {
   const fetchAssignments = useCallback(async () => {
     if (!clientId) return
     setLoading(true)
+    // Fetch just user_id + assigned_at; profile names are resolved separately
+    // from the profiles list (avoids a cross-schema FK join issue with PostgREST)
     const { data } = await supabase
       .from('client_assignments')
-      .select('user_id, assigned_at, profiles(full_name, email)')
+      .select('user_id, assigned_at')
       .eq('client_id', clientId)
       .order('assigned_at')
     setAssignments((data ?? []) as unknown as DbClientAssignment[])

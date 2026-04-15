@@ -10,9 +10,10 @@ export function useClients() {
     setLoading(true)
 
     // Try with assignments join; fall back to plain select if migration hasn't run yet
+    // No profiles join here — names are resolved client-side from useProfiles()
     const { data, error } = await supabase
       .from('clients')
-      .select('*, client_assignments(user_id, assigned_at, profiles(full_name, email))')
+      .select('*, client_assignments(user_id, assigned_at)')
 
     if (error) {
       const fallback = await supabase.from('clients').select('*')
