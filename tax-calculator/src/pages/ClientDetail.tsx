@@ -459,6 +459,7 @@ export default function ClientDetail() {
 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [confirmDeleteClient, setConfirmDeleteClient] = useState(false)
+  const [planStatusFilter, setPlanStatusFilter] = useState<'all' | 'draft' | 'in_progress' | 'completed'>('all')
   const [notes, setNotes] = useState<string | null>(null)
   const [notesInitialized, setNotesInitialized] = useState(false)
   const [clientCode, setClientCode] = useState<string | null>(null)
@@ -922,8 +923,26 @@ export default function ClientDetail() {
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <div className="bg-slate-50 px-5 py-3 border-b border-slate-200">
+        <div className="bg-slate-50 px-5 py-3 border-b border-slate-200 flex items-center justify-between gap-3 flex-wrap">
           <h2 className="text-sm font-semibold text-slate-700">Tax Plans</h2>
+          <div className="flex items-center gap-1">
+            {(['all', 'draft', 'in_progress', 'completed'] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => setPlanStatusFilter(s)}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                  planStatusFilter === s
+                    ? s === 'all'          ? 'bg-slate-700 text-white'
+                    : s === 'draft'        ? 'bg-amber-500 text-white'
+                    : s === 'in_progress'  ? 'bg-blue-500 text-white'
+                    :                        'bg-emerald-500 text-white'
+                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                }`}
+              >
+                {s === 'all' ? 'All' : s === 'in_progress' ? 'In Progress' : s.charAt(0).toUpperCase() + s.slice(1)}
+              </button>
+            ))}
+          </div>
         </div>
         {loading
           ? (
@@ -946,15 +965,19 @@ export default function ClientDetail() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {reports.length === 0
+                {reports.filter(r => planStatusFilter === 'all' || r.pipeline_status === planStatusFilter).length === 0
                   ? (
                     <tr>
                       <td colSpan={6} className="text-center text-slate-400 py-8">
-                        No tax plans for this client yet.
+                        {reports.length === 0
+                          ? 'No tax plans for this client yet.'
+                          : `No ${planStatusFilter === 'in_progress' ? 'in-progress' : planStatusFilter} plans.`}
                       </td>
                     </tr>
                   )
-                  : reports.map(report => {
+                  : reports
+                    .filter(r => planStatusFilter === 'all' || r.pipeline_status === planStatusFilter)
+                    .map(report => {
                     const input = report.input_snapshot as unknown as TaxInput
                     const output = report.output_snapshot as unknown as TaxOutput
                     return (

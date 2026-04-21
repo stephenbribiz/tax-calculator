@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useClients } from '@/hooks/useClients'
+import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { Button } from '@/components/ui/Button'
 import { AssigneeFilter } from '@/components/ui/AssigneeFilter'
 import { assigneeInitials } from '@/lib/assignees'
@@ -99,16 +100,10 @@ export default function ClientList() {
   const { clients, loading } = useClients()
   const [search, setSearch] = useState('')
   const [sortField, setSortField] = useState<SortField>('owner')
-  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
+  const { selected: selectedAssignees, toggle: toggleAssignee, clear: clearAssignees } = useAssigneeFilter()
 
   function toggleSort(field: SortField) {
     setSortField(field)
-  }
-
-  function toggleAssignee(name: string) {
-    setSelectedAssignees(prev =>
-      prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
-    )
   }
 
   const sortedClients = useMemo(() => sortClients(clients, sortField), [clients, sortField])
@@ -152,7 +147,7 @@ export default function ClientList() {
         <AssigneeFilter
           selected={selectedAssignees}
           onToggle={toggleAssignee}
-          onClear={() => setSelectedAssignees([])}
+          onClear={clearAssignees}
         />
       </div>
 

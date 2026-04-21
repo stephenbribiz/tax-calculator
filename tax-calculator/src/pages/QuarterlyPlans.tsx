@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useReports } from '@/hooks/useReports'
 import { useClients } from '@/hooks/useClients'
+import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { AssigneeFilter } from '@/components/ui/AssigneeFilter'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { Badge } from '@/components/ui/Badge'
@@ -76,7 +77,7 @@ export default function QuarterlyPlans() {
   const [year, setYear] = useState(currentYear)
   const [quarter, setQuarter] = useState<Quarter>('Q1')
   const [viewMode, setViewMode] = useState<ViewMode>('pipeline')
-  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
+  const { selected: selectedAssignees, toggle: toggleAssignee, clear: clearAssignees } = useAssigneeFilter()
   const [sortCol, setSortCol] = useState<SortCol>('client')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string } | null>(null)
@@ -341,10 +342,8 @@ export default function QuarterlyPlans() {
         {/* Staff filter */}
         <AssigneeFilter
           selected={selectedAssignees}
-          onToggle={name => setSelectedAssignees(prev =>
-            prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
-          )}
-          onClear={() => setSelectedAssignees([])}
+          onToggle={toggleAssignee}
+          onClear={clearAssignees}
         />
       </div>
 

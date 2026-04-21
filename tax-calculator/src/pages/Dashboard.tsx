@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useClients } from '@/hooks/useClients'
 import { useReports } from '@/hooks/useReports'
+import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -35,7 +36,7 @@ export default function Dashboard() {
   const { clients, loading: clientsLoading } = useClients()
   const { reports, loading: reportsLoading } = useReports()
   const [clientSearch, setClientSearch] = useState('')
-  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
+  const { selected: selectedAssignees, toggle: toggleAssignee, clear: clearAssignees } = useAssigneeFilter()
 
   const { quarter: currentQuarter, year: currentYear } = getPreviousQuarter()
 
@@ -126,8 +127,8 @@ export default function Dashboard() {
           <div className="mb-3">
             <AssigneeFilter
               selected={selectedAssignees}
-              onToggle={name => setSelectedAssignees(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name])}
-              onClear={() => setSelectedAssignees([])}
+              onToggle={toggleAssignee}
+              onClear={clearAssignees}
             />
           </div>
           <div className="space-y-2">
