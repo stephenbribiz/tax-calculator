@@ -89,11 +89,15 @@ export default function QuarterlyPlans() {
     return years
   }, [reports, currentYear])
 
-  // In pipeline view: all quarters for the year; in table view: filter by selected quarter
+  // In pipeline view: all quarters for the year; in table view: completed plans only, filtered by quarter
   const filteredRows = useMemo<PlanRow[]>(() => {
     const filtered = reports.filter(r => {
       if (r.tax_year !== year) return false
-      if (viewMode === 'table' && r.quarter !== quarter) return false
+      if (viewMode === 'table') {
+        // Table only shows completed plans
+        if (r.pipeline_status !== 'completed') return false
+        if (r.quarter !== quarter) return false
+      }
       if (selectedAssignees.length > 0) {
         const client = clients.find(c => c.id === r.client_id)
         return selectedAssignees.some(name => (client?.assignees ?? []).includes(name))
@@ -182,15 +186,18 @@ export default function QuarterlyPlans() {
   // ── Pipeline card component ──
   function PipelineCard({ row }: { row: PlanRow }) {
     const stageIdx = PIPELINE_STAGES.findIndex(s => s.key === row.pipelineStatus)
-    const canAdvance = stageIdx < PIPELINE_STAGES.length - 1
     const canRetreat = stageIdx > 0
 
-    async function advance() {
-      const nextStage = PIPELINE_STAGES[stageIdx + 1].key
-      const err = await updatePipelineStatus(row.reportId, nextStage)
+    async function start() {
+      // Advance Draft → In Progress, then open the editor
+      const err = await updatePipelineStatus(row.reportId, 'in_progress')
       if (err) { toast('Failed to update status', 'error'); return }
-      // "Start" opens the plan editor; "Complete" just moves the card
-      if (stageIdx === 0) navigate(`/reports/new?edit=${row.reportId}`)
+      navigate(`/reports/new?edit=${row.reportId}`)
+    }
+
+    function openForCompletion() {
+      // In Progress → navigate to view page; the Finalize button lives there
+      navigate(`/reports/${row.reportId}`)
     }
 
     async function retreat() {
@@ -234,13 +241,22 @@ export default function QuarterlyPlans() {
           >
             View
           </Link>
-          {canAdvance && (
+          {stageIdx === 0 && (
             <button
-              onClick={advance}
-              title="Move to next stage"
+              onClick={start}
+              title="Open plan to begin editing"
               className="flex-1 text-[10px] bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200 rounded px-2 py-1 transition-colors font-medium"
             >
-              {stageIdx === 0 ? 'Start →' : 'Complete →'}
+              Start →
+            </button>
+          )}
+          {stageIdx === 1 && (
+            <button
+              onClick={openForCompletion}
+              title="Open plan to finalize"
+              className="flex-1 text-[10px] bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded px-2 py-1 transition-colors font-medium"
+            >
+              Finalize →
             </button>
           )}
           <button
@@ -407,8 +423,10 @@ export default function QuarterlyPlans() {
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
             {tableRows.length === 0 ? (
               <div className="p-8 text-center text-sm text-slate-400">
-                No tax plans found for {quarter} {year}.
-                {selectedAssignees.length > 0 && ' Try clearing the staff filter.'}
+                No completed plans for {quarter} {year}.{' '}
+                {selectedAssignees.length > 0
+                  ? 'Try clearing the staff filter.'
+                  : 'Finalize plans from the Pipeline view to see them here.'}
               </div>
             ) : (
               <div className="overflow-x-auto">
