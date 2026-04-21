@@ -63,6 +63,19 @@ export interface DbReport {
   input_snapshot: Record<string, unknown>
   output_snapshot: Record<string, unknown>
   is_final: boolean
+  pipeline_status: 'draft' | 'in_progress' | 'completed'
+}
+
+export interface DbBusiness {
+  id: string
+  created_at: string
+  created_by: string
+  owner_client_id: string
+  company_name: string
+  company_type: string
+  company_code: string | null
+  state: string
+  notes: string | null
 }
 
 export interface DbDocument {

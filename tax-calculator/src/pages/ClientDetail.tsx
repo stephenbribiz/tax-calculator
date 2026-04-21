@@ -15,6 +15,7 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { DropZone } from '@/components/upload/DropZone'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
+import { BusinessesPanel } from '@/components/client/BusinessesPanel'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { COMPANY_TYPE_OPTIONS } from '@/constants/companyTypes'
 import { STATE_OPTIONS } from '@/constants/states'
@@ -647,6 +648,8 @@ export default function ClientDetail() {
           <div className="flex items-center gap-2 mb-1">
             <Link to="/" className="text-sm text-slate-400 hover:text-slate-600">Dashboard</Link>
             <span className="text-slate-300">/</span>
+            <Link to="/clients" className="text-sm text-slate-400 hover:text-slate-600">Clients</Link>
+            <span className="text-slate-300">/</span>
             <span className="text-sm text-slate-600">{client.owner_name}</span>
           </div>
           <h1 className="text-2xl font-bold text-slate-900">{client.owner_name}</h1>
@@ -960,8 +963,11 @@ export default function ClientDetail() {
                           <Link to={`/reports/${report.id}`} className="font-medium text-orange-600 hover:underline">
                             {report.quarter} {report.tax_year}
                           </Link>
-                          {!report.is_final && (
+                          {report.pipeline_status === 'draft' && (
                             <Badge variant="warning" className="ml-2">Draft</Badge>
+                          )}
+                          {report.pipeline_status === 'completed' && (
+                            <Badge variant="success" className="ml-2">Completed</Badge>
                           )}
                         </td>
                         <td className="px-5 py-3 text-right text-slate-600">
@@ -1007,6 +1013,8 @@ export default function ClientDetail() {
       </div>
 
       {!loading && <QuarterComparison reports={reports} />}
+
+      {id && <BusinessesPanel clientId={id} />}
 
       {id && <DocumentsPanel clientId={id} taxYear={new Date().getFullYear()} />}
 

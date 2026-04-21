@@ -25,7 +25,20 @@ export function useReports(clientId?: string) {
     return error
   }
 
-  return { reports, loading, error, refetch: fetchReports, deleteReport }
+  async function updatePipelineStatus(id: string, status: DbReport['pipeline_status']) {
+    const { error } = await supabase
+      .from('reports')
+      .update({ pipeline_status: status })
+      .eq('id', id)
+    if (!error) {
+      setReports(prev =>
+        prev.map(r => r.id === id ? { ...r, pipeline_status: status } : r)
+      )
+    }
+    return error
+  }
+
+  return { reports, loading, error, refetch: fetchReports, deleteReport, updatePipelineStatus }
 }
 
 export async function getReport(id: string) {
