@@ -3,14 +3,30 @@
 -- Run this in the Supabase SQL editor.
 -- All statements are idempotent — safe to run multiple times.
 --
--- 1. Add pipeline_status column to reports table
+-- 1. Open reports RLS so ALL authenticated users can read/update/delete
+--    any report (mirrors the clients policy from the assignees migration).
+--    Without this, Brian cannot advance/delete Stephen's plans and vice versa.
+-- 2. Add pipeline_status column to reports table
 --    Values: 'draft' | 'in_progress' | 'completed'
 --    Existing is_final=true reports → 'in_progress'
 --    Existing is_final=false reports → 'draft'
--- 2. Create businesses table (multiple businesses per client)
+-- 3. Create businesses table (multiple businesses per client)
 -- ============================================================
 
--- 1. Add pipeline_status to reports
+-- 1. Reports RLS — open to all authenticated users
+DROP POLICY IF EXISTS "reports_select" ON public.reports;
+CREATE POLICY "reports_select" ON public.reports
+  FOR SELECT USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "reports_update" ON public.reports;
+CREATE POLICY "reports_update" ON public.reports
+  FOR UPDATE USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "reports_delete" ON public.reports;
+CREATE POLICY "reports_delete" ON public.reports
+  FOR DELETE USING (auth.role() = 'authenticated');
+
+-- 2. Add pipeline_status to reports
 ALTER TABLE public.reports
   ADD COLUMN IF NOT EXISTS pipeline_status text NOT NULL DEFAULT 'draft';
 
