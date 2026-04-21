@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useReports } from '@/hooks/useReports'
 import { useClients } from '@/hooks/useClients'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
@@ -70,6 +70,7 @@ function buildRow(r: DbReport): PlanRow {
 
 export default function QuarterlyPlans() {
   const currentYear = new Date().getFullYear()
+  const navigate = useNavigate()
   const { reports, loading: reportsLoading, deleteReport, updatePipelineStatus } = useReports()
   const { clients } = useClients()
   const { toast } = useToast()
@@ -187,7 +188,9 @@ export default function QuarterlyPlans() {
     async function advance() {
       const nextStage = PIPELINE_STAGES[stageIdx + 1].key
       const err = await updatePipelineStatus(row.reportId, nextStage)
-      if (err) toast('Failed to update status', 'error')
+      if (err) { toast('Failed to update status', 'error'); return }
+      // "Start" opens the plan editor; "Complete" just moves the card
+      if (stageIdx === 0) navigate(`/reports/new?edit=${row.reportId}`)
     }
 
     async function retreat() {
