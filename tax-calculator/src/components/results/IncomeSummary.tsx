@@ -31,6 +31,46 @@ export function IncomeSummary({ input, output }: Props) {
 
       {/* Rows */}
       <div className="px-6 pb-2">
+        {/* Multi-business per-company table */}
+        {input.businessBreakdown && input.businessBreakdown.length > 1 && (
+          <div className="mb-3">
+            <div className="rounded-lg border border-slate-100 overflow-hidden text-xs">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wide">
+                    <th className="text-left px-3 py-1.5">Company</th>
+                    <th className="text-right px-3 py-1.5">Net Income</th>
+                    {input.businessBreakdown.some(r => r.companyType === 'S-Corp') && (
+                      <th className="text-right px-3 py-1.5">Salary</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {input.businessBreakdown.map(row => (
+                    <tr key={row.businessId}>
+                      <td className="px-3 py-1.5 text-slate-700">
+                        {row.companyName}
+                        <span className="ml-1 text-slate-400">{row.companyType}</span>
+                      </td>
+                      <td className="px-3 py-1.5 text-right tabular-nums text-slate-800">
+                        {formatCurrency(row.netIncome)}
+                      </td>
+                      {input.businessBreakdown!.some(r => r.companyType === 'S-Corp') && (
+                        <td className="px-3 py-1.5 text-right tabular-nums text-slate-800">
+                          {row.companyType === 'S-Corp' && row.shareholderSalary > 0
+                            ? formatCurrency(row.shareholderSalary)
+                            : <span className="text-slate-300">—</span>
+                          }
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {input.companyType === 'S-Corp' && input.shareholderSalary > 0 ? (
           // S-Corp breakdown: K-1 income + shareholder salary = effective income
           <>
@@ -68,11 +108,21 @@ export function IncomeSummary({ input, output }: Props) {
         {output.seTaxDeduction > 0 && (
           <Row label="SE Tax Deduction" value={`− ${formatCurrency(output.seTaxDeduction)}`} />
         )}
-        {output.qbiDeduction > 0 && (
-          <Row label="QBI Deduction (20%)" value={`− ${formatCurrency(output.qbiDeduction)}`} />
+        {output.allocatedBusinessIncome > 0 && (
+          output.qbiDeduction > 0
+            ? <Row label="QBI Deduction (20%)" value={`− ${formatCurrency(output.qbiDeduction)}`} />
+            : (
+              <div className="flex justify-between items-center py-2">
+                <span className="text-sm text-slate-600">QBI Deduction (20%)</span>
+                <div className="text-right">
+                  <span className="text-sm font-medium text-slate-400 tabular-nums">$0</span>
+                  <span className="ml-2 text-[10px] text-slate-400 italic">phased out</span>
+                </div>
+              </div>
+            )
         )}
         <Row
-          label={`${output.effectiveDeduction !== output.standardDeduction ? 'Itemized' : 'Standard'} Deduction`}
+          label={input.deductionOverride !== null ? 'Itemized Deduction' : 'Standard Deduction'}
           value={`− ${formatCurrency(output.effectiveDeduction)}`}
         />
         {(input.otherIncome > 0 || input.spousalIncome > 0) && (

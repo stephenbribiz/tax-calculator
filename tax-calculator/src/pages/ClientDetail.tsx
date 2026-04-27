@@ -462,11 +462,6 @@ export default function ClientDetail() {
   const [planStatusFilter, setPlanStatusFilter] = useState<'all' | 'draft' | 'in_progress' | 'completed'>('all')
   const [notes, setNotes] = useState<string | null>(null)
   const [notesInitialized, setNotesInitialized] = useState(false)
-  const [clientCode, setClientCode] = useState<string | null>(null)
-  const [codeInitialized, setCodeInitialized] = useState(false)
-  const [codeEditing, setCodeEditing] = useState(false)
-  const [codeInput, setCodeInput] = useState('')
-  const [codeSaving, setCodeSaving] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editSaving, setEditSaving] = useState(false)
   const [editForm, setEditForm] = useState({
@@ -477,18 +472,15 @@ export default function ClientDetail() {
     filing_status: '' as FilingStatus,
     ownership_pct: 100,
     num_dependents: 0,
+    client_code: '',
   })
 
   const client = clients.find(c => c.id === id)
 
-  // Initialize notes and code from client data once loaded
+  // Initialize notes from client data once loaded
   if (client && !notesInitialized) {
     setNotes(client.notes ?? '')
     setNotesInitialized(true)
-  }
-  if (client && !codeInitialized) {
-    setClientCode(client.client_code ?? '')
-    setCodeInitialized(true)
   }
 
   // ── Assignee state (must come after `client` is resolved) ──
@@ -550,32 +542,6 @@ export default function ClientDetail() {
     else await refreshClients()
   }
 
-  function startEditCode() {
-    setCodeInput(clientCode ?? '')
-    setCodeEditing(true)
-  }
-
-  function cancelEditCode() {
-    setCodeEditing(false)
-    setCodeInput('')
-  }
-
-  async function saveClientCode() {
-    if (!client) return
-    setCodeSaving(true)
-    const code = codeInput.trim().toUpperCase()
-    await supabase
-      .from('clients')
-      .update({ client_code: code || null })
-      .eq('id', client.id)
-    setClientCode(code || null)
-    await refreshClients()
-    setCodeSaving(false)
-    setCodeEditing(false)
-    setCodeInput('')
-    toast('Client code saved')
-  }
-
   async function saveNotes() {
     if (!client) return
     const trimmed = (notes ?? '').trim()
@@ -589,13 +555,14 @@ export default function ClientDetail() {
   function startEditing() {
     if (!client) return
     setEditForm({
-      company_name: client.company_name,
-      owner_name: client.owner_name,
-      company_type: client.company_type as CompanyType,
-      state: client.state as StateCode,
+      company_name:  client.company_name,
+      owner_name:    client.owner_name,
+      company_type:  client.company_type as CompanyType,
+      state:         client.state as StateCode,
       filing_status: (client.filing_status ?? 'Single') as FilingStatus,
       ownership_pct: client.ownership_pct ?? 100,
       num_dependents: client.num_dependents ?? 0,
+      client_code:   client.client_code ?? '',
     })
     setEditing(true)
   }
@@ -603,6 +570,7 @@ export default function ClientDetail() {
   async function saveEdit() {
     if (!client) return
     setEditSaving(true)
+    const code = editForm.client_code.trim().toUpperCase()
     const { error } = await supabase
       .from('clients')
       .update({
@@ -613,6 +581,7 @@ export default function ClientDetail() {
         filing_status:  editForm.filing_status,
         ownership_pct:  editForm.ownership_pct,
         num_dependents: editForm.num_dependents,
+        client_code:    code || null,
       })
       .eq('id', client.id)
     if (error) {
@@ -845,6 +814,21 @@ export default function ClientDetail() {
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none"
               />
             </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Client Code
+                <span className="ml-1 font-normal text-slate-400">(2–4 letters, for bulk upload)</span>
+              </label>
+              <input
+                type="text"
+                value={editForm.client_code}
+                onChange={e => setEditForm(f => ({ ...f, client_code: e.target.value.replace(/[^A-Za-z]/g, '').slice(0, 4) }))}
+                placeholder="e.g. GBG"
+                maxLength={4}
+                style={{ textTransform: 'uppercase' }}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none"
+              />
+            </div>
           </div>
           <div className="flex justify-end gap-2 mt-4">
             <button
@@ -864,54 +848,9 @@ export default function ClientDetail() {
         <ClientTaxSummary reports={reports} />
       )}
 
-      <div className="mb-6 grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="sm:col-span-1">
-          <label className="block text-xs font-semibold text-slate-500 mb-1">Client Code</label>
-          {codeEditing ? (
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={codeInput}
-                onChange={e => setCodeInput(e.target.value.replace(/[^A-Za-z]/g, '').slice(0, 4))}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') saveClientCode()
-                  if (e.key === 'Escape') cancelEditCode()
-                }}
-                placeholder="e.g., GBG"
-                maxLength={4}
-                autoFocus
-                style={{ textTransform: 'uppercase' }}
-                className="text-sm text-slate-600 bg-white rounded-lg p-3 border border-orange-400 ring-1 ring-orange-400 w-full focus:outline-none font-mono"
-              />
-              <Button size="sm" onClick={saveClientCode} loading={codeSaving} disabled={codeSaving} className="shrink-0">
-                Save
-              </Button>
-              <button
-                onClick={cancelEditCode}
-                className="text-xs text-slate-400 hover:text-slate-600 px-1"
-                aria-label="Cancel"
-              >
-                ✕
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-sm font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg px-3 py-3 min-w-[72px] tracking-widest">
-                {clientCode || <span className="text-slate-400 font-normal tracking-normal">—</span>}
-              </span>
-              <button
-                onClick={startEditCode}
-                className="text-xs text-orange-600 hover:text-orange-800 font-medium"
-              >
-                Edit
-              </button>
-            </div>
-          )}
-          <p className="text-[10px] text-slate-400 mt-1">2–4 letters for bulk upload matching</p>
-        </div>
-        <div className="sm:col-span-3">
-          <label className="block text-xs font-semibold text-slate-500 mb-1">Notes</label>
-          <textarea
+      <div className="mb-6">
+        <label className="block text-xs font-semibold text-slate-500 mb-1">Notes</label>
+        <textarea
           rows={3}
           value={notes ?? ''}
           onChange={e => setNotes(e.target.value)}
@@ -919,7 +858,6 @@ export default function ClientDetail() {
           placeholder="Add notes about this client..."
           className="text-sm text-slate-600 bg-slate-50 rounded-lg p-3 border border-slate-200 w-full resize-y focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none"
         />
-        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">

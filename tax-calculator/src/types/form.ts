@@ -1,4 +1,4 @@
-import type { CompanyType, FilingStatus, Quarter, StateCode } from './engine'
+import type { BusinessRow, CompanyType, FilingStatus, OutputOverrides, Quarter, StateCode } from './engine'
 
 export interface Step1Data {
   companyName: string
@@ -30,6 +30,8 @@ export interface Step3Data {
   priorFEPaid: number              // TN F&E estimates already paid
   deductionOverride: number | null
   annualizeIncome: boolean
+  businessBreakdown?: BusinessRow[]
+  outputOverrides?: OutputOverrides
 }
 
 export interface FormState {

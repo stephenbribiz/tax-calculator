@@ -3,6 +3,17 @@ export type CompanyType = 'S-Corp' | 'LLC' | 'Partnership' | 'Single-Member-LLC'
 export type Quarter = 'Q1' | 'Q2' | 'Q3' | 'Q4'
 export type StateCode = 'TN' | 'CA' | 'GA' | 'NC' | 'NY' | 'TX' | 'AZ' | 'FL'
 
+/** Per-company financial row used when a client has multiple businesses */
+export interface BusinessRow {
+  businessId: string        // 'primary' for the main client company, or businesses.id from DB
+  companyName: string
+  companyType: CompanyType
+  netIncome: number
+  mealExpense: number
+  shareholderSalary: number    // S-Corp only, 0 otherwise
+  federalWithholding: number   // S-Corp only, 0 otherwise
+}
+
 export interface TaxInput {
   // Step 1 — Client Info
   companyName: string
@@ -31,6 +42,22 @@ export interface TaxInput {
   priorFEPaid: number              // TN F&E estimates already paid this year
   deductionOverride: number | null  // null = use standard deduction
   annualizeIncome: boolean
+
+  // Present when client has multiple businesses — stored in snapshot for display only.
+  // The engine always receives the summed totals in the fields above.
+  businessBreakdown?: BusinessRow[]
+
+  // Manual overrides applied on top of the calculated output before saving.
+  // Stored in the input snapshot so they can be restored when editing a saved plan.
+  outputOverrides?: OutputOverrides
+}
+
+/** Values the user can manually override on top of the calculated TaxOutput */
+export interface OutputOverrides {
+  qbiDeduction?: number
+  totalFederalOwed?: number
+  totalStateOwed?: number
+  netAmountDue?: number
 }
 
 export interface BracketTier {

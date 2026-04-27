@@ -8,6 +8,7 @@
  */
 
 import { useState } from 'react'
+import { ASSIGNEE_GROUPS } from '@/lib/assignees'
 
 const STORAGE_KEY = 'tax-calc-assignee-filter'
 
@@ -36,9 +37,30 @@ export function useAssigneeFilter() {
 
   function toggle(name: string) {
     setSelected(prev => {
-      const next = prev.includes(name)
-        ? prev.filter(n => n !== name)
-        : [...prev, name]
+      let next: string[]
+
+      if (prev.includes(name)) {
+        // Deselecting
+        const group = ASSIGNEE_GROUPS.find(g => g.lead === name)
+        // If deselecting a lead, also clear its sub-members
+        next = group
+          ? prev.filter(n => n !== name && !group.members.includes(n))
+          : prev.filter(n => n !== name)
+      } else {
+        // Selecting
+        const parentGroup = ASSIGNEE_GROUPS.find(g => g.members.includes(name))
+        if (parentGroup) {
+          // Selecting a sub-member → remove parent lead so sub-filter is specific
+          next = [...prev.filter(n => n !== parentGroup.lead), name]
+        } else {
+          // Selecting a lead → drop any of its sub-members (lead covers them all)
+          const group = ASSIGNEE_GROUPS.find(g => g.lead === name)
+          next = group
+            ? [...prev.filter(n => !group.members.includes(n)), name]
+            : [...prev, name]
+        }
+      }
+
       writeToStorage(next)
       return next
     })

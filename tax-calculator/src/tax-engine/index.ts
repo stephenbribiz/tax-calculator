@@ -67,8 +67,16 @@ export function calculateTax(input: TaxInput): TaxOutput {
   )
   const businessTaxableIncome = Math.max(0, businessAdjustedIncome - proratedDeduction)
 
-  // 9. QBI deduction (prorated — it's an annual deduction)
-  const fullQbiDeduction = calculateQBI(businessAdjustedIncome, taxableIncome, input.filingStatus, taxData)
+  // 9. QBI deduction — phase-out always uses annualized income.
+  // QBI phase-out thresholds are annual dollar amounts. Comparing prorated quarter
+  // income against annual thresholds would incorrectly pass the phase-out test for
+  // high earners (e.g. $200k Q1 = $800k annual but the prorated $200k < $191k threshold).
+  // We annualize the income here to get the correct phase-out, then prorate the result.
+  const annualBizAdjForQBI = proration > 0 ? businessAdjustedIncome / proration : businessAdjustedIncome
+  const annualTaxableForQBI = proration > 0
+    ? Math.max(0, totalAGI / proration - fullDeduction)
+    : Math.max(0, totalAGI - fullDeduction)
+  const fullQbiDeduction = calculateQBI(annualBizAdjForQBI, annualTaxableForQBI, input.filingStatus, taxData)
   const qbiDeduction = fullQbiDeduction * proration
 
   const taxableIncomeWithQBI = Math.max(0, taxableIncome - qbiDeduction)
@@ -94,7 +102,11 @@ export function calculateTax(input: TaxInput): TaxOutput {
     // Calculate full-year tax on annualized income with full deduction/credit,
     // then take the quarterly share. This gives correct bracket placement.
     const annAllocated = annualizedAllocatedIncome!
-    const annSENet = Math.max(0, annAllocated + mealAddBack)
+    // Annualize meal add-back to match income scale — using Q1 meal expense as-is
+    // against an annualized income base would understate AGI by (1 - proration) × mealAddBack,
+    // causing effectiveRate × taxableIncome ≠ grossTax.
+    const annMealAddBack = mealAddBack / proration
+    const annSENet = Math.max(0, annAllocated + annMealAddBack)
     const annSETax = calculateSETax(annSENet, input.taxYear, input.companyType)
 
     // For S-Corp: annualize salary the same way as K-1 income, then combine
@@ -103,9 +115,9 @@ export function calculateTax(input: TaxInput): TaxOutput {
       ? Math.max(0, annAllocated + annSalary)
       : annAllocated
 
-    const annAGI = effectiveAnnAllocated + input.otherIncome + input.spousalIncome + mealAddBack - annSETax.deductibleHalf
+    const annAGI = effectiveAnnAllocated + input.otherIncome + input.spousalIncome + annMealAddBack - annSETax.deductibleHalf
     const annTaxable = Math.max(0, annAGI - fullDeduction)
-    const annBusinessAdj = Math.max(0, effectiveAnnAllocated + mealAddBack - annSETax.deductibleHalf)
+    const annBusinessAdj = Math.max(0, effectiveAnnAllocated + annMealAddBack - annSETax.deductibleHalf)
     const annBusinessTaxable = Math.max(0, annBusinessAdj - fullDeduction)
 
     const annQBI = calculateQBI(annBusinessAdj, annTaxable, input.filingStatus, taxData)
@@ -198,7 +210,9 @@ export function calculateTax(input: TaxInput): TaxOutput {
       allocatedBusinessIncome: actualAllocatedIncome,
       mealAddBack,
       seTaxDeduction: seTaxResult.deductibleHalf,
-      qbiDeduction,
+      // Use the annualized-path QBI (correctly phase-tested against annual income),
+      // prorated to the quarter for display.
+      qbiDeduction: annQBI * proration,
       standardDeduction,
       effectiveDeduction: proratedDeduction,
       taxableIncome: taxableIncomeWithQBI,

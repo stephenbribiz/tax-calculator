@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import type { Step3Data } from '@/types'
-import type { CompanyType } from '@/types'
+import type { BusinessRow, CompanyType } from '@/types/engine'
+import type { DbBusiness } from '@/lib/supabase'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import { Toggle } from '@/components/ui/Toggle'
 import { Button } from '@/components/ui/Button'
@@ -18,6 +20,8 @@ interface Step3Props {
   ownershipPct?: number
   stateCode?: string
   clientId?: string
+  businesses?: DbBusiness[]
+  primaryCompanyName?: string
   onSubmit: (data: Step3Data) => void
   onBack: () => void
 }
@@ -130,6 +134,57 @@ function SavedDocumentPicker({
   )
 }
 
+/** Build the initial per-business breakdown rows */
+function buildInitialBreakdown(
+  businesses: DbBusiness[],
+  defaultValues: Step3Data,
+  companyType: CompanyType,
+  primaryCompanyName: string,
+): BusinessRow[] {
+  // If the saved plan already has a breakdown, use it — but merge in any new businesses
+  // that may have been added to the DB since the plan was saved.
+  const saved = defaultValues.businessBreakdown
+  if (saved && saved.length > 0) {
+    // Keep saved rows in order; append any DB businesses not already present
+    const savedIds = new Set(saved.map(r => r.businessId))
+    const newRows: BusinessRow[] = businesses
+      .filter(b => !savedIds.has(b.id))
+      .map(b => ({
+        businessId: b.id,
+        companyName: b.company_name,
+        companyType: b.company_type as CompanyType,
+        netIncome: 0,
+        mealExpense: 0,
+        shareholderSalary: 0,
+        federalWithholding: 0,
+      }))
+    return [...saved, ...newRows]
+  }
+
+  // First time: build from primary company + DB businesses
+  const primaryRow: BusinessRow = {
+    businessId: 'primary',
+    companyName: primaryCompanyName || 'Primary Business',
+    companyType,
+    netIncome: defaultValues.businessNetIncome,
+    mealExpense: defaultValues.mealExpense,
+    shareholderSalary: defaultValues.shareholderSalary,
+    federalWithholding: defaultValues.federalWithholding,
+  }
+
+  const businessRows: BusinessRow[] = businesses.map(b => ({
+    businessId: b.id,
+    companyName: b.company_name,
+    companyType: b.company_type as CompanyType,
+    netIncome: 0,
+    mealExpense: 0,
+    shareholderSalary: 0,
+    federalWithholding: 0,
+  }))
+
+  return [primaryRow, ...businessRows]
+}
+
 export function Step3FinancialData({
   defaultValues,
   companyType,
@@ -138,12 +193,63 @@ export function Step3FinancialData({
   ownershipPct = 100,
   stateCode,
   clientId,
+  businesses = [],
+  primaryCompanyName = '',
   onSubmit,
   onBack,
 }: Step3Props) {
   const { control, handleSubmit, setValue } = useForm<Step3Data>({ defaultValues })
   const isScorp = companyType === 'S-Corp'
   const showFEField = stateCode === 'TN' && companyType !== 'Sole-Prop'
+
+  // Multi-business mode: active when the client has businesses in the DB
+  const isMultiBusiness = businesses.length > 0
+
+  // Per-business breakdown (only used in multi-business mode)
+  const [breakdown, setBreakdown] = useState<BusinessRow[]>(() =>
+    isMultiBusiness
+      ? buildInitialBreakdown(businesses, defaultValues, companyType, primaryCompanyName)
+      : []
+  )
+
+  // When businesses list changes (async load), rebuild if we haven't yet
+  useEffect(() => {
+    if (!isMultiBusiness) return
+    setBreakdown(prev =>
+      prev.length > 0
+        ? prev
+        : buildInitialBreakdown(businesses, defaultValues, companyType, primaryCompanyName)
+    )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMultiBusiness])
+
+  // Sync breakdown totals into RHF fields so the normal form submit path works
+  useEffect(() => {
+    if (!isMultiBusiness || breakdown.length === 0) return
+    const totalNetIncome      = breakdown.reduce((s, r) => s + r.netIncome, 0)
+    const totalMealExpense    = breakdown.reduce((s, r) => s + r.mealExpense, 0)
+    const totalSalary         = breakdown.reduce((s, r) => s + r.shareholderSalary, 0)
+    const totalWithholding    = breakdown.reduce((s, r) => s + r.federalWithholding, 0)
+    setValue('businessNetIncome',  totalNetIncome)
+    setValue('mealExpense',        totalMealExpense)
+    setValue('shareholderSalary',  totalSalary)
+    setValue('federalWithholding', totalWithholding)
+  }, [breakdown, isMultiBusiness, setValue])
+
+  function updateBreakdownRow(idx: number, field: keyof BusinessRow, value: number) {
+    setBreakdown(prev => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row))
+  }
+
+  // Derived: does any row in the breakdown include an S-Corp?
+  const hasAnySCorp = isMultiBusiness && breakdown.some(r => r.companyType === 'S-Corp')
+
+  // Breakdown totals for the footer row
+  const breakdownTotals = {
+    netIncome:         breakdown.reduce((s, r) => s + r.netIncome, 0),
+    mealExpense:       breakdown.reduce((s, r) => s + r.mealExpense, 0),
+    shareholderSalary: breakdown.reduce((s, r) => s + r.shareholderSalary, 0),
+    federalWithholding:breakdown.reduce((s, r) => s + r.federalWithholding, 0),
+  }
 
   function handlePLApply(values: Record<string, number>) {
     for (const [key, val] of Object.entries(values)) {
@@ -154,6 +260,11 @@ export function Step3FinancialData({
   function handleADPApply(salary: number | null, withholding: number | null) {
     if (salary != null) setValue('shareholderSalary', salary, { shouldDirty: true, shouldValidate: true })
     if (withholding != null) setValue('federalWithholding', withholding, { shouldDirty: true, shouldValidate: true })
+  }
+
+  // Inject businessBreakdown into the submitted data in multi-business mode
+  function internalSubmit(data: Step3Data) {
+    onSubmit(isMultiBusiness ? { ...data, businessBreakdown: breakdown } : data)
   }
 
   // Get standard deduction for the selected year/filing status
@@ -167,80 +278,178 @@ export function Step3FinancialData({
   const shareholderSalary = useWatch({ control, name: 'shareholderSalary' })
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form onSubmit={handleSubmit(internalSubmit)} className="space-y-6">
 
-      {/* Saved documents quick-apply (shown only when a known client is selected) */}
-      {clientId && (
-        <SavedDocumentPicker
-          clientId={clientId}
-          taxYear={taxYear}
-          isScorp={isScorp}
-          onApplyPL={handlePLApply}
-          onApplyADP={handleADPApply}
-        />
+      {/* ── MULTI-BUSINESS BREAKDOWN ── */}
+      {isMultiBusiness && (
+        <div>
+          <h4 className="text-sm font-semibold text-slate-700 mb-3 pb-1 border-b border-slate-100">
+            Business Breakdown
+            <span className="text-xs font-normal text-slate-400 ml-2">Enter YTD figures for each company — totals flow into the tax calculation</span>
+          </h4>
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wide border-b border-slate-200">
+                  <th className="text-left px-4 py-2.5">Company</th>
+                  <th className="text-right px-3 py-2.5 min-w-[140px]">Net Income (YTD)</th>
+                  <th className="text-right px-3 py-2.5 min-w-[130px]">Meal Expense</th>
+                  {hasAnySCorp && <th className="text-right px-3 py-2.5 min-w-[150px]">Shareholder Salary</th>}
+                  {hasAnySCorp && <th className="text-right px-3 py-2.5 min-w-[150px]">Fed Withholding</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {breakdown.map((row, idx) => {
+                  const rowIsScorp = row.companyType === 'S-Corp'
+                  return (
+                    <tr key={row.businessId} className="bg-white">
+                      <td className="px-4 py-2.5">
+                        <div>
+                          <span className="font-medium text-slate-800">{row.companyName}</span>
+                          <span className="ml-1.5 text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{row.companyType}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        <CurrencyInput
+                          value={row.netIncome}
+                          onChange={v => updateBreakdownRow(idx, 'netIncome', v)}
+                          className="text-right"
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <CurrencyInput
+                          value={row.mealExpense}
+                          onChange={v => updateBreakdownRow(idx, 'mealExpense', v)}
+                          className="text-right"
+                        />
+                      </td>
+                      {hasAnySCorp && (
+                        <td className="px-3 py-2">
+                          {rowIsScorp
+                            ? <CurrencyInput value={row.shareholderSalary} onChange={v => updateBreakdownRow(idx, 'shareholderSalary', v)} className="text-right" />
+                            : <span className="block text-center text-slate-300 py-2">—</span>
+                          }
+                        </td>
+                      )}
+                      {hasAnySCorp && (
+                        <td className="px-3 py-2">
+                          {rowIsScorp
+                            ? <CurrencyInput value={row.federalWithholding} onChange={v => updateBreakdownRow(idx, 'federalWithholding', v)} className="text-right" />
+                            : <span className="block text-center text-slate-300 py-2">—</span>
+                          }
+                        </td>
+                      )}
+                    </tr>
+                  )
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-slate-200 bg-slate-50 font-semibold text-slate-700 text-sm">
+                  <td className="px-4 py-2.5">Combined Total</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums">{formatCurrency(breakdownTotals.netIncome)}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums">{formatCurrency(breakdownTotals.mealExpense)}</td>
+                  {hasAnySCorp && <td className="px-3 py-2.5 text-right tabular-nums">{formatCurrency(breakdownTotals.shareholderSalary)}</td>}
+                  {hasAnySCorp && <td className="px-3 py-2.5 text-right tabular-nums">{formatCurrency(breakdownTotals.federalWithholding)}</td>}
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
       )}
 
-      {/* P&L Upload */}
-      <PLUpload companyType={companyType} onApply={handlePLApply} />
+      {/* ── SINGLE-BUSINESS: document quick-apply + P&L upload ── */}
+      {!isMultiBusiness && (
+        <>
+          {clientId && (
+            <SavedDocumentPicker
+              clientId={clientId}
+              taxYear={taxYear}
+              isScorp={isScorp}
+              onApplyPL={handlePLApply}
+              onApplyADP={handleADPApply}
+            />
+          )}
+          <PLUpload companyType={companyType} onApply={handlePLApply} />
+        </>
+      )}
 
-      {/* Business Income */}
-      <div>
-        <h4 className="text-sm font-semibold text-slate-700 mb-3 pb-1 border-b border-slate-100">
-          Business Income
-        </h4>
-        <div className="space-y-4">
-          <Controller name="businessNetIncome" control={control} render={({ field }) => (
-            <div>
-              <CurrencyInput
-                label="Business Net Income (YTD)"
-                hint="Cumulative net profit through this quarter (after business expenses, before owner distributions)"
-                value={field.value}
-                onChange={field.onChange}
-              />
-              {businessNetIncome < 0 && (
-                <p className="text-xs text-amber-600 mt-1">Net income is negative. This will reduce your tax estimate.</p>
-              )}
-              {businessNetIncome * (ownershipPct / 100) > 10_000_000 && (
-                <p className="text-xs text-amber-600 mt-1">Please verify this amount.</p>
-              )}
-            </div>
-          )} />
-
-          {isScorp && (
-            <>
-              <Controller name="shareholderSalary" control={control} render={({ field }) => (
-                <div>
-                  <CurrencyInput
-                    label="Shareholder Salary Paid (YTD)"
-                    hint="Cumulative W-2 salary paid to the shareholder through this quarter. FICA already withheld will be subtracted."
-                    value={field.value}
-                    onChange={field.onChange}
-                  />
-                  {shareholderSalary > businessNetIncome && businessNetIncome > 0 && (
-                    <p className="text-xs text-amber-600 mt-1">Shareholder salary exceeds business net income.</p>
-                  )}
-                </div>
-              )} />
-              <Controller name="federalWithholding" control={control} render={({ field }) => (
+      {/* ── SINGLE-BUSINESS: Business Income fields ── */}
+      {!isMultiBusiness && (
+        <div>
+          <h4 className="text-sm font-semibold text-slate-700 mb-3 pb-1 border-b border-slate-100">
+            Business Income
+          </h4>
+          <div className="space-y-4">
+            <Controller name="businessNetIncome" control={control} render={({ field }) => (
+              <div>
                 <CurrencyInput
-                  label="Federal Income Tax Withheld (YTD)"
-                  hint="Cumulative federal income tax withheld from shareholder payroll through this quarter."
+                  label="Business Net Income (YTD)"
+                  hint="Cumulative net profit through this quarter (after business expenses, before owner distributions)"
                   value={field.value}
                   onChange={field.onChange}
                 />
-              )} />
-            </>
-          )}
+                {businessNetIncome < 0 && (
+                  <p className="text-xs text-amber-600 mt-1">Net income is negative. This will reduce your tax estimate.</p>
+                )}
+                {businessNetIncome * (ownershipPct / 100) > 10_000_000 && (
+                  <p className="text-xs text-amber-600 mt-1">Please verify this amount.</p>
+                )}
+              </div>
+            )} />
 
-          <Controller name="mealExpense" control={control} render={({ field }) => (
-            <CurrencyInput
-              label="Business Meal / Food Expense"
-              hint="50% of this amount is deductible"
-              value={field.value}
-              onChange={field.onChange}
-            />
-          )} />
+            {isScorp && (
+              <>
+                <Controller name="shareholderSalary" control={control} render={({ field }) => (
+                  <div>
+                    <CurrencyInput
+                      label="Shareholder Salary Paid (YTD)"
+                      hint="Cumulative W-2 salary paid to the shareholder through this quarter. FICA already withheld will be subtracted."
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
+                    {shareholderSalary > businessNetIncome && businessNetIncome > 0 && (
+                      <p className="text-xs text-amber-600 mt-1">Shareholder salary exceeds business net income.</p>
+                    )}
+                  </div>
+                )} />
+                <Controller name="federalWithholding" control={control} render={({ field }) => (
+                  <CurrencyInput
+                    label="Federal Income Tax Withheld (YTD)"
+                    hint="Cumulative federal income tax withheld from shareholder payroll through this quarter."
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )} />
+              </>
+            )}
 
+            <Controller name="mealExpense" control={control} render={({ field }) => (
+              <CurrencyInput
+                label="Business Meal / Food Expense"
+                hint="50% of this amount is deductible"
+                value={field.value}
+                onChange={field.onChange}
+              />
+            )} />
+
+            <Controller name="shareholderDraw" control={control} render={({ field }) => (
+              <CurrencyInput
+                label="Shareholder Draw (Expensed)"
+                hint="For records only — not tax deductible"
+                value={field.value}
+                onChange={field.onChange}
+              />
+            )} />
+          </div>
+        </div>
+      )}
+
+      {/* ── MULTI-BUSINESS: shareholder draw (informational) ── */}
+      {isMultiBusiness && (
+        <div>
+          <h4 className="text-sm font-semibold text-slate-700 mb-3 pb-1 border-b border-slate-100">
+            Other Business Entries
+          </h4>
           <Controller name="shareholderDraw" control={control} render={({ field }) => (
             <CurrencyInput
               label="Shareholder Draw (Expensed)"
@@ -250,7 +459,7 @@ export function Step3FinancialData({
             />
           )} />
         </div>
-      </div>
+      )}
 
       {/* Other Income */}
       <div>
