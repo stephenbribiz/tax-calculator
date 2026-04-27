@@ -69,6 +69,7 @@ export default function QuickCalculator() {
       numDependentChildren: profile.numDependentChildren,
       state:                profile.state,
       ...financials,
+      feAdjustedSalary:     0,
     }
   }, [profile, financials])
 
@@ -106,6 +107,7 @@ export default function QuickCalculator() {
       numDependentChildren: profile.numDependentChildren,
       state:                profile.state,
       ...data,
+      feAdjustedSalary:     0,
     }
     setOutput(calculateTax(input))
     setStep('results')

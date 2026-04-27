@@ -42,8 +42,11 @@ export function calculateTax(input: TaxInput): TaxOutput {
   // 4. SE tax always on actual K-1 income (S-Corp SE tax = $0; salary uses FICA instead)
   // Salary used as TN excise wage deduction: when feUsesAdjustedSalary is on and there IS an
   // adjusted salary, use it to reduce the excise base (adjustedSalary already > shareholderSalary).
-  const feSalary = (input.feUsesAdjustedSalary && isSCorp && input.adjustedSalary > input.shareholderSalary)
-    ? input.adjustedSalary
+  // FE salary: when toggle is on and adjusted salary is larger, use it for TN excise base.
+  // Uses feAdjustedSalary (always the raw form value) rather than adjustedSalary (gated by FICA confirmation).
+  const feSalaryCandidate = input.feAdjustedSalary ?? input.adjustedSalary
+  const feSalary = (input.feUsesAdjustedSalary && isSCorp && feSalaryCandidate > input.shareholderSalary)
+    ? feSalaryCandidate
     : input.shareholderSalary
 
   const seNetIncome = Math.max(0, actualAllocatedIncome + mealAddBack)

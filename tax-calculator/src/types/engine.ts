@@ -42,7 +42,8 @@ export interface TaxInput {
   priorFEPaid: number              // TN F&E estimates already paid this year
   deductionOverride: number | null  // null = use standard deduction
   annualizeIncome: boolean
-  feUsesAdjustedSalary: boolean  // TN S-Corp: use adjustedSalary as excise tax wage deduction
+  feUsesAdjustedSalary: boolean  // TN S-Corp: use feAdjustedSalary as excise tax wage deduction
+  feAdjustedSalary: number       // TN S-Corp: raw adjusted salary for F&E (always set, independent of FICA confirmation)
 
   // Present when client has multiple businesses — stored in snapshot for display only.
   // The engine always receives the summed totals in the fields above.

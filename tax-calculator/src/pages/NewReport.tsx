@@ -50,6 +50,7 @@ function toTaxInput(s1: Step1Data, s2: Step2Data, s3: Step3Data): TaxInput {
     deductionOverride:    s3.deductionOverride,
     annualizeIncome:         s3.annualizeIncome,
     feUsesAdjustedSalary:    s3.feUsesAdjustedSalary ?? false,
+    feAdjustedSalary:        s3.adjustedSalary,   // raw, not gated by FICA confirmation
     businessBreakdown:       s3.businessBreakdown,
     outputOverrides:         s3.outputOverrides,
   }
@@ -75,17 +76,18 @@ function fromTaxInput(input: TaxInput): { step1: Step1Data; step2: Step2Data; st
     step3: {
       businessNetIncome:   input.businessNetIncome,
       shareholderSalary:   input.shareholderSalary,
-      adjustedSalary:      input.adjustedSalary ?? 0,
-      // A saved plan with a non-zero adjustedSalary had it confirmed — restore that state.
+      // feAdjustedSalary holds the raw (unconfirmed) adjusted salary; fall back to adjustedSalary for old plans
+      adjustedSalary:      input.feAdjustedSalary ?? input.adjustedSalary ?? 0,
+      // A saved plan with a non-zero adjustedSalary had it confirmed — restore that state
       payrollAdjConfirmed: (input.adjustedSalary ?? 0) > 0,
       federalWithholding:  input.federalWithholding ?? 0,
-      mealExpense:        input.mealExpense,
-      shareholderDraw:    input.shareholderDraw,
-      otherIncome:        input.otherIncome,
-      spousalIncome:      input.spousalIncome,
-      priorEstimatesPaid: input.priorEstimatesPaid,
-      priorFEPaid:        input.priorFEPaid ?? 0,
-      deductionOverride:  input.deductionOverride,
+      mealExpense:         input.mealExpense,
+      shareholderDraw:     input.shareholderDraw,
+      otherIncome:         input.otherIncome,
+      spousalIncome:       input.spousalIncome,
+      priorEstimatesPaid:  input.priorEstimatesPaid,
+      priorFEPaid:         input.priorFEPaid ?? 0,
+      deductionOverride:   input.deductionOverride,
       annualizeIncome:         input.annualizeIncome,
       feUsesAdjustedSalary:    input.feUsesAdjustedSalary ?? false,
       businessBreakdown:       input.businessBreakdown,

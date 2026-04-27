@@ -38,7 +38,7 @@ export function ResultsPanel({ input, output, onPayrollAdj, payrollAdjState, onF
           onPayrollAdj={onPayrollAdj}
         />
       )}
-      <StateBreakdown input={input} output={output} onFEToggle={onFEToggle} />
+      <StateBreakdown input={input} output={output} onFEToggle={onFEToggle} payrollAdjState={payrollAdjState} />
     </div>
   )
 }
