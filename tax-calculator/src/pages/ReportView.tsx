@@ -56,10 +56,13 @@ export default function ReportView() {
   const handleFEToggle = useCallback((feUsesAdjustedSalary: boolean) => {
     if (!input) return
     const updatedInput = { ...input, feUsesAdjustedSalary }
+    console.log('[FEToggle] feUsesAdjustedSalary=', feUsesAdjustedSalary, 'shareholderSalary=', input.shareholderSalary, 'businessNetIncome=', input.businessNetIncome)
     setInput(updatedInput)
     try {
-      setOutput(calculateTax(updatedInput))
-    } catch { /* ignore */ }
+      const newOutput = calculateTax(updatedInput)
+      console.log('[FEToggle] exciseTax=', newOutput.state.exciseTax, 'totalStateOwed=', newOutput.totalStateOwed)
+      setOutput(newOutput)
+    } catch (e) { console.error('[FEToggle] error', e) }
   }, [input])
 
   async function finalizePlan() {
