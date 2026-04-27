@@ -33,7 +33,7 @@ const defaultStep3: Step3Data = {
   priorFEPaid:        0,
   deductionOverride:       null,
   annualizeIncome:         false,
-  feUsesAdjustedSalary:    false,
+  feUsesAdjustedSalary:    true,   // TN S-Corp: deduct salary from excise base by default
 }
 
 const initialState: FormState = {

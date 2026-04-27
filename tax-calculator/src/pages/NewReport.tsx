@@ -49,7 +49,7 @@ function toTaxInput(s1: Step1Data, s2: Step2Data, s3: Step3Data): TaxInput {
     priorFEPaid:          s3.priorFEPaid,
     deductionOverride:    s3.deductionOverride,
     annualizeIncome:         s3.annualizeIncome,
-    feUsesAdjustedSalary:    s3.feUsesAdjustedSalary ?? false,
+    feUsesAdjustedSalary:    s3.feUsesAdjustedSalary ?? true,
     feAdjustedSalary:        s3.adjustedSalary,   // raw, not gated by FICA confirmation
     businessBreakdown:       s3.businessBreakdown,
     outputOverrides:         s3.outputOverrides,
@@ -89,7 +89,7 @@ function fromTaxInput(input: TaxInput): { step1: Step1Data; step2: Step2Data; st
       priorFEPaid:         input.priorFEPaid ?? 0,
       deductionOverride:   input.deductionOverride,
       annualizeIncome:         input.annualizeIncome,
-      feUsesAdjustedSalary:    input.feUsesAdjustedSalary ?? false,
+      feUsesAdjustedSalary:    input.feUsesAdjustedSalary ?? true,  // old plans default to ON (deduct)
       businessBreakdown:       input.businessBreakdown,
       outputOverrides:         input.outputOverrides,
     },

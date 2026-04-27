@@ -33,10 +33,15 @@ export function calculateTN(
   // LLCs and Single-Member LLCs in TN are subject only to the Franchise Tax.
   const entitySubjectToExcise = companyType === 'S-Corp' || companyType === 'Partnership'
 
-  // Excise tax: 6.5% on net earnings AFTER deductible shareholder wages
-  const netEarningsAfterWages = Math.max(0, fullBusinessIncome - salary)
-  const exciseTax = entitySubjectToExcise && netEarningsAfterWages > 0
-    ? netEarningsAfterWages * 0.065
+  // feUsesAdjustedSalary controls whether the salary is deducted from the excise base.
+  // undefined/true → deduct salary (default; preserves behaviour for plans created before toggle existed).
+  // false → no deduction; excise is on the full net income.
+  const deductSalary = feUsesAdjustedSalary !== false
+  const exciseBase = deductSalary
+    ? Math.max(0, fullBusinessIncome - salary)
+    : Math.max(0, fullBusinessIncome)
+  const exciseTax = entitySubjectToExcise && exciseBase > 0
+    ? exciseBase * 0.065
     : 0
 
   // Franchise tax: 0.25% of net worth (minimum $100/year)
@@ -51,18 +56,17 @@ export function calculateTN(
     const entityLabel = companyType ?? 'Entity'
     if (entitySubjectToExcise) {
       notes.push(`${entityLabel} is subject to TN Franchise & Excise Tax.`)
-      if (feUsesAdjustedSalary && salary > 0) {
-        notes.push(`Adjusted shareholder salary ($${salary.toLocaleString()}) applied to excise tax base per salary adjustment toggle.`)
-      }
       if (exciseTax > 0) {
-        if (salary > 0) {
-          notes.push(`Excise Tax: 6.5% × $${netEarningsAfterWages.toLocaleString()} (net earnings of $${fullBusinessIncome.toLocaleString()} minus wages of $${salary.toLocaleString()}).`)
+        if (deductSalary && salary > 0) {
+          notes.push(`Excise Tax: 6.5% × $${exciseBase.toLocaleString()} (net earnings of $${fullBusinessIncome.toLocaleString()} minus wages of $${salary.toLocaleString()}).`)
+        } else if (!deductSalary && salary > 0) {
+          notes.push(`Excise Tax: 6.5% × $${exciseBase.toLocaleString()} net earnings (salary deduction not applied).`)
         } else {
-          notes.push(`Excise Tax: 6.5% × $${fullBusinessIncome.toLocaleString()} net earnings.`)
+          notes.push(`Excise Tax: 6.5% × $${exciseBase.toLocaleString()} net earnings.`)
         }
       } else if (fullBusinessIncome <= 0) {
         notes.push('No Excise Tax owed — business has no positive net earnings.')
-      } else if (salary >= fullBusinessIncome) {
+      } else if (deductSalary && salary >= fullBusinessIncome) {
         notes.push('No Excise Tax owed — shareholder wages offset net earnings.')
       }
     } else {
