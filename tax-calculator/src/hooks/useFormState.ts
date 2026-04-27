@@ -31,8 +31,9 @@ const defaultStep3: Step3Data = {
   spousalIncome:      0,
   priorEstimatesPaid: 0,
   priorFEPaid:        0,
-  deductionOverride:  null,
-  annualizeIncome:    false,
+  deductionOverride:       null,
+  annualizeIncome:         false,
+  feUsesAdjustedSalary:    false,
 }
 
 const initialState: FormState = {

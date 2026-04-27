@@ -20,6 +20,7 @@ export function calculateTN(
   companyType?: CompanyType,
   businessNetIncome?: number,
   shareholderSalary?: number,
+  feUsesAdjustedSalary?: boolean,
 ): StateResult {
   const fullBusinessIncome = businessNetIncome ?? 0
   const salary = shareholderSalary ?? 0
@@ -50,6 +51,9 @@ export function calculateTN(
     const entityLabel = companyType ?? 'Entity'
     if (entitySubjectToExcise) {
       notes.push(`${entityLabel} is subject to TN Franchise & Excise Tax.`)
+      if (feUsesAdjustedSalary && salary > 0) {
+        notes.push(`Adjusted shareholder salary ($${salary.toLocaleString()}) applied to excise tax base per salary adjustment toggle.`)
+      }
       if (exciseTax > 0) {
         if (salary > 0) {
           notes.push(`Excise Tax: 6.5% × $${netEarningsAfterWages.toLocaleString()} (net earnings of $${fullBusinessIncome.toLocaleString()} minus wages of $${salary.toLocaleString()}).`)

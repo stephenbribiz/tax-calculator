@@ -20,9 +20,11 @@ interface Props {
   payrollAdjState?: PayrollAdjState
   /** Legacy: accepted but unused — ReportView passes nothing here */
   onAdjustedSalaryChange?: (value: number) => void
+  /** TN S-Corp: called when the F&E adjusted-salary toggle is flipped */
+  onFEToggle?: (feUsesAdjustedSalary: boolean) => void
 }
 
-export function ResultsPanel({ input, output, onPayrollAdj, payrollAdjState }: Props) {
+export function ResultsPanel({ input, output, onPayrollAdj, payrollAdjState, onFEToggle }: Props) {
   return (
     <div className="space-y-5">
       <TaxSummary input={input} output={output} />
@@ -36,7 +38,7 @@ export function ResultsPanel({ input, output, onPayrollAdj, payrollAdjState }: P
           onPayrollAdj={onPayrollAdj}
         />
       )}
-      <StateBreakdown input={input} output={output} />
+      <StateBreakdown input={input} output={output} onFEToggle={onFEToggle} />
     </div>
   )
 }

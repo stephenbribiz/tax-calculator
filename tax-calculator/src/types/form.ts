@@ -30,6 +30,7 @@ export interface Step3Data {
   priorFEPaid: number              // TN F&E estimates already paid
   deductionOverride: number | null
   annualizeIncome: boolean
+  feUsesAdjustedSalary: boolean  // TN S-Corp: use adjustedSalary as excise tax wage deduction
   businessBreakdown?: BusinessRow[]
   outputOverrides?: OutputOverrides
 }

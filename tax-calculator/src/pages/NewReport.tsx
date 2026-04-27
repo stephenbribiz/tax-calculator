@@ -48,9 +48,10 @@ function toTaxInput(s1: Step1Data, s2: Step2Data, s3: Step3Data): TaxInput {
     priorEstimatesPaid:   s3.priorEstimatesPaid,
     priorFEPaid:          s3.priorFEPaid,
     deductionOverride:    s3.deductionOverride,
-    annualizeIncome:      s3.annualizeIncome,
-    businessBreakdown:    s3.businessBreakdown,
-    outputOverrides:      s3.outputOverrides,
+    annualizeIncome:         s3.annualizeIncome,
+    feUsesAdjustedSalary:    s3.feUsesAdjustedSalary ?? false,
+    businessBreakdown:       s3.businessBreakdown,
+    outputOverrides:         s3.outputOverrides,
   }
 }
 
@@ -85,9 +86,10 @@ function fromTaxInput(input: TaxInput): { step1: Step1Data; step2: Step2Data; st
       priorEstimatesPaid: input.priorEstimatesPaid,
       priorFEPaid:        input.priorFEPaid ?? 0,
       deductionOverride:  input.deductionOverride,
-      annualizeIncome:    input.annualizeIncome,
-      businessBreakdown:  input.businessBreakdown,
-      outputOverrides:    input.outputOverrides,
+      annualizeIncome:         input.annualizeIncome,
+      feUsesAdjustedSalary:    input.feUsesAdjustedSalary ?? false,
+      businessBreakdown:       input.businessBreakdown,
+      outputOverrides:         input.outputOverrides,
     },
   }
 }
@@ -423,6 +425,11 @@ export default function NewReport() {
     dispatch({ type: 'SET_STEP3', payload: { ...state.step3, adjustedSalary, payrollAdjConfirmed: confirmed } })
   }, [dispatch, state.step3])
 
+  // Called by StateBreakdown when the TN F&E adjusted-salary toggle is flipped
+  const handleFEToggle = useCallback((feUsesAdjustedSalary: boolean) => {
+    dispatch({ type: 'SET_STEP3', payload: { ...state.step3, feUsesAdjustedSalary } })
+  }, [dispatch, state.step3])
+
   async function handleSave() {
     if (!effectiveOutput || !user) return
     const output = effectiveOutput  // save the effective (possibly overridden) output
@@ -695,6 +702,7 @@ export default function NewReport() {
                 payrollAdjConfirmed: state.step3.payrollAdjConfirmed,
                 shareholderSalary:   state.step3.shareholderSalary,
               }}
+              onFEToggle={handleFEToggle}
             />
           </div>
         </div>

@@ -295,6 +295,7 @@ export default function BulkUpload() {
             priorFEPaid:          0,
             deductionOverride:    null,
             annualizeIncome:      false,
+            feUsesAdjustedSalary: false,
           }
 
           const output = calculateTax(taxInput)

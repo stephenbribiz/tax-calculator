@@ -40,6 +40,12 @@ export function calculateTax(input: TaxInput): TaxOutput {
   const mealAddBack = input.mealExpense * 0.5
 
   // 4. SE tax always on actual K-1 income (S-Corp SE tax = $0; salary uses FICA instead)
+  // Salary used as TN excise wage deduction: when feUsesAdjustedSalary is on and there IS an
+  // adjusted salary, use it to reduce the excise base (adjustedSalary already > shareholderSalary).
+  const feSalary = (input.feUsesAdjustedSalary && isSCorp && input.adjustedSalary > input.shareholderSalary)
+    ? input.adjustedSalary
+    : input.shareholderSalary
+
   const seNetIncome = Math.max(0, actualAllocatedIncome + mealAddBack)
   const seTaxResult = calculateSETax(seNetIncome, input.taxYear, input.companyType)
 
@@ -180,7 +186,8 @@ export function calculateTax(input: TaxInput): TaxOutput {
       year: input.taxYear,
       companyType: input.companyType,
       businessNetIncome: input.businessNetIncome,
-      shareholderSalary: input.shareholderSalary,
+      shareholderSalary: feSalary,
+      feUsesAdjustedSalary: input.feUsesAdjustedSalary,
     })
     totalStateOwed = annState.stateIncomeTax * proration
 
@@ -193,7 +200,8 @@ export function calculateTax(input: TaxInput): TaxOutput {
       year: input.taxYear,
       companyType: input.companyType,
       businessNetIncome: input.businessNetIncome,
-      shareholderSalary: input.shareholderSalary,
+      shareholderSalary: feSalary,
+      feUsesAdjustedSalary: input.feUsesAdjustedSalary,
     })
 
     // Add entity-level taxes (excise + franchise) — full annual amount minus prior F&E payments
@@ -279,7 +287,8 @@ export function calculateTax(input: TaxInput): TaxOutput {
     year: input.taxYear,
     companyType: input.companyType,
     businessNetIncome: input.businessNetIncome,
-    shareholderSalary: input.shareholderSalary,
+    shareholderSalary: feSalary,
+    feUsesAdjustedSalary: input.feUsesAdjustedSalary,
   })
   totalStateOwed = state.stateIncomeTax // no proration
 
