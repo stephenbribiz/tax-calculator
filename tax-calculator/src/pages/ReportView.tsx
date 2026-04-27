@@ -1,10 +1,11 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import type { TaxInput, TaxOutput } from '@/types'
 import type { DbReport } from '@/lib/supabase'
+import { calculateTax } from '@/tax-engine'
 import { ResultsPanel } from '@/components/results/ResultsPanel'
 import { Button } from '@/components/ui/Button'
 import { ExcelDownloadButton } from '@/components/ExcelDownloadButton'
@@ -50,6 +51,16 @@ export default function ReportView() {
 
     load()
   }, [id])
+
+  // Allow the TN F&E salary toggle to recalculate live even on the read-only view
+  const handleFEToggle = useCallback((feUsesAdjustedSalary: boolean) => {
+    if (!input) return
+    const updatedInput = { ...input, feUsesAdjustedSalary }
+    setInput(updatedInput)
+    try {
+      setOutput(calculateTax(updatedInput))
+    } catch { /* ignore */ }
+  }, [input])
 
   async function finalizePlan() {
     if (!id) return
@@ -149,7 +160,7 @@ export default function ReportView() {
         </div>
       </div>
 
-      <ResultsPanel input={input} output={output} />
+      <ResultsPanel input={input} output={output} onFEToggle={handleFEToggle} />
 
       <ConfirmModal
         open={confirmFinalize}
