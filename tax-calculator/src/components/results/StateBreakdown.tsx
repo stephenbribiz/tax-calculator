@@ -66,7 +66,7 @@ export function StateBreakdown({ input, output, onFEToggle }: Props) {
             </p>
 
             {/* TN S-Corp: toggle to deduct shareholder salary from excise tax base */}
-            {input.state === 'TN' && input.companyType === 'S-Corp' && input.shareholderSalary > 0 && (
+            {input.state === 'TN' && input.companyType === 'S-Corp' && (
               <div className="mb-3 flex items-start gap-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2.5">
                 <button
                   type="button"
