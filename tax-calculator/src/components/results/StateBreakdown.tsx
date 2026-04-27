@@ -27,8 +27,6 @@ function Row({ label, value, muted }: { label: string; value: string; muted?: bo
 
 export function StateBreakdown({ input, output, onFEToggle }: Props) {
   const { state } = output
-  // DEBUG — remove after confirming deploy is live
-  console.log('[StateBreakdown] state=', input.state, 'type=', input.companyType, 'salary=', input.shareholderSalary, 'hasEntityTax=', state.exciseTax > 0 || state.franchiseTax > 0)
   const hasStateTax = state.stateIncomeTax > 0
   const hasEntityTax = state.exciseTax > 0 || state.franchiseTax > 0
   const annualFE = state.exciseTax + state.franchiseTax
