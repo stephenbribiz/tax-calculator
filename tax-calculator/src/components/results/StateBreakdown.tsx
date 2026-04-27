@@ -66,16 +66,17 @@ export function StateBreakdown({ input, output, onFEToggle }: Props) {
             </p>
 
             {/* TN S-Corp: toggle to deduct shareholder salary from excise tax base */}
-            {input.state === 'TN' && input.companyType === 'S-Corp' && input.shareholderSalary > 0 && onFEToggle && (
+            {input.state === 'TN' && input.companyType === 'S-Corp' && input.shareholderSalary > 0 && (
               <div className="mb-3 flex items-start gap-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2.5">
                 <button
                   type="button"
                   role="switch"
                   aria-checked={!!input.feUsesAdjustedSalary}
-                  onClick={() => onFEToggle(!input.feUsesAdjustedSalary)}
-                  className={`relative inline-flex h-5 w-9 shrink-0 mt-0.5 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-1 ${
-                    input.feUsesAdjustedSalary ? 'bg-orange-500' : 'bg-slate-300'
-                  }`}
+                  onClick={() => onFEToggle && onFEToggle(!input.feUsesAdjustedSalary)}
+                  disabled={!onFEToggle}
+                  className={`relative inline-flex h-5 w-9 shrink-0 mt-0.5 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-1 ${
+                    onFEToggle ? 'cursor-pointer' : 'cursor-default opacity-60'
+                  } ${input.feUsesAdjustedSalary ? 'bg-orange-500' : 'bg-slate-300'}`}
                 >
                   <span
                     className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${
