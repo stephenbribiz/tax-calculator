@@ -87,7 +87,7 @@ export function StateBreakdown({ input, output, onFEToggle }: Props) {
                 <div className="text-xs text-slate-600 leading-relaxed">
                   <span className="font-medium text-slate-700">Deduct salary from F&E excise base</span>
                   <span className="block text-slate-400 mt-0.5">
-                    When on, shareholder salary ({formatCurrency(input.shareholderSalary)}) is deducted from net income before calculating the 6.5% excise tax.
+                    When on, the adjusted salary ({formatCurrency(input.feAdjustedSalary || input.adjustedSalary || input.shareholderSalary)}) is deducted from net income before calculating the 6.5% excise tax.
                   </span>
                 </div>
               </div>

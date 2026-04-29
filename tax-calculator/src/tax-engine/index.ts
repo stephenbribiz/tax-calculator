@@ -44,7 +44,9 @@ export function calculateTax(input: TaxInput): TaxOutput {
   // adjusted salary, use it to reduce the excise base (adjustedSalary already > shareholderSalary).
   // Always pass the current shareholder salary to the state tax module.
   // The feUsesAdjustedSalary toggle is forwarded so TN can decide whether to deduct it.
-  const feSalary = input.shareholderSalary
+  // For F&E excise deduction, prefer the adjusted salary from the S-Corp analysis box
+  // (feAdjustedSalary / adjustedSalary). Fall back to actual paid salary for older plans.
+  const feSalary = input.feAdjustedSalary || input.adjustedSalary || input.shareholderSalary
 
   const seNetIncome = Math.max(0, actualAllocatedIncome + mealAddBack)
   const seTaxResult = calculateSETax(seNetIncome, input.taxYear, input.companyType)
