@@ -21,9 +21,14 @@ export function calculateTN(
   businessNetIncome?: number,
   shareholderSalary?: number,
   feUsesAdjustedSalary?: boolean,
+  tnApportionmentPct?: number,
 ): StateResult {
   const fullBusinessIncome = businessNetIncome ?? 0
   const salary = shareholderSalary ?? 0
+
+  // Apportionment: only the apportioned share is subject to TN F&E
+  const apportionmentPct = (tnApportionmentPct ?? 100) / 100
+  const apportionedIncome = fullBusinessIncome * apportionmentPct
 
   // Entities subject to TN Franchise Tax (minimum $100/year)
   const entitySubjectToFranchise = companyType === 'S-Corp' || companyType === 'LLC'
@@ -38,12 +43,11 @@ export function calculateTN(
   // false → no deduction; excise is on the full net income.
   const deductSalary = feUsesAdjustedSalary !== false
   const exciseBase = deductSalary
-    ? Math.max(0, fullBusinessIncome - salary)
-    : Math.max(0, fullBusinessIncome)
+    ? Math.max(0, apportionedIncome - salary)
+    : Math.max(0, apportionedIncome)
   const exciseTax = entitySubjectToExcise && exciseBase > 0
     ? exciseBase * 0.065
     : 0
-  console.log('[TN] fullBusinessIncome=', fullBusinessIncome, 'feSalary=', salary, 'deductSalary=', deductSalary, 'exciseBase=', exciseBase, 'exciseTax=', exciseTax)
 
   // Franchise tax: 0.25% of net worth (minimum $100/year)
   // We don't have net worth data, so use the minimum as an estimate
@@ -53,21 +57,25 @@ export function calculateTN(
     'Tennessee has no individual state income tax.',
   ]
 
+  if (apportionmentPct < 1) {
+    notes.push(`TN apportionment: ${(apportionmentPct * 100).toFixed(1)}% of $${fullBusinessIncome.toLocaleString()} = $${apportionedIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })} subject to F&E.`)
+  }
+
   if (entitySubjectToFranchise) {
     const entityLabel = companyType ?? 'Entity'
     if (entitySubjectToExcise) {
       notes.push(`${entityLabel} is subject to TN Franchise & Excise Tax.`)
       if (exciseTax > 0) {
         if (deductSalary && salary > 0) {
-          notes.push(`Excise Tax: 6.5% × $${exciseBase.toLocaleString()} (net earnings of $${fullBusinessIncome.toLocaleString()} minus wages of $${salary.toLocaleString()}).`)
+          notes.push(`Excise Tax: 6.5% × $${exciseBase.toLocaleString()} (apportioned earnings of $${apportionedIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })} minus wages of $${salary.toLocaleString()}).`)
         } else if (!deductSalary && salary > 0) {
           notes.push(`Excise Tax: 6.5% × $${exciseBase.toLocaleString()} net earnings (salary deduction not applied).`)
         } else {
           notes.push(`Excise Tax: 6.5% × $${exciseBase.toLocaleString()} net earnings.`)
         }
-      } else if (fullBusinessIncome <= 0) {
+      } else if (apportionedIncome <= 0) {
         notes.push('No Excise Tax owed — business has no positive net earnings.')
-      } else if (deductSalary && salary >= fullBusinessIncome) {
+      } else if (deductSalary && salary >= apportionedIncome) {
         notes.push('No Excise Tax owed — shareholder wages offset net earnings.')
       }
     } else {

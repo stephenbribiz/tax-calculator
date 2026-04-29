@@ -297,6 +297,9 @@ export default function BulkUpload() {
             annualizeIncome:      false,
             feUsesAdjustedSalary: false,
             feAdjustedSalary:     0,
+            tnApportionmentPct:      100,
+            taxableIncomeOverride:   null,
+            federalRateOverride:     null,
           }
 
           const output = calculateTax(taxInput)

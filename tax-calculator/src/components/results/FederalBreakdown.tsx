@@ -1,7 +1,13 @@
+import { useState } from 'react'
 import type { TaxInput, TaxOutput } from '@/types'
 import { formatCurrency } from '@/lib/utils'
 
-interface Props { input: TaxInput; output: TaxOutput }
+interface Props {
+  input: TaxInput
+  output: TaxOutput
+  onTaxableIncomeOverride?: (val: number | null) => void
+  onFederalRateOverride?: (val: number | null) => void
+}
 
 function Row({ label, value, muted, indent }: { label: string; value: string; muted?: boolean; indent?: boolean }) {
   return (
@@ -12,9 +18,104 @@ function Row({ label, value, muted, indent }: { label: string; value: string; mu
   )
 }
 
-export function FederalBreakdown({ input, output }: Props) {
+/** Small inline-editable field with amber highlight when value differs from the placeholder (calculated) value */
+function OverrideInput({
+  placeholder,
+  value,
+  onChange,
+  onReset,
+  suffix,
+  isOverridden,
+}: {
+  placeholder: string
+  value: string
+  onChange: (raw: string) => void
+  onReset: () => void
+  suffix?: string
+  isOverridden: boolean
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="relative">
+        <input
+          type="text"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={placeholder}
+          className={`w-28 text-right text-sm tabular-nums border rounded-lg px-2 py-1 pr-${suffix ? '6' : '2'} focus:outline-none focus:ring-2 focus:ring-orange-400 ${
+            isOverridden
+              ? 'border-amber-400 bg-amber-50 text-amber-900'
+              : 'border-slate-200 bg-slate-50 text-slate-700'
+          }`}
+        />
+        {suffix && (
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
+            {suffix}
+          </span>
+        )}
+      </div>
+      {isOverridden && (
+        <button
+          type="button"
+          onClick={onReset}
+          title="Reset to calculated value"
+          className="text-xs text-amber-600 hover:text-amber-800 font-medium whitespace-nowrap"
+        >
+          ↩ reset
+        </button>
+      )}
+    </div>
+  )
+}
+
+export function FederalBreakdown({ input, output, onTaxableIncomeOverride, onFederalRateOverride }: Props) {
   const { federal, scorp } = output
   const isScorp = input.companyType === 'S-Corp'
+  const canAdjust = !!(onTaxableIncomeOverride || onFederalRateOverride)
+
+  // Local display state — tracks the raw string the user is typing
+  const [tiRaw, setTiRaw] = useState<string>(
+    input.taxableIncomeOverride != null ? String(input.taxableIncomeOverride) : ''
+  )
+  const [rateRaw, setRateRaw] = useState<string>(
+    input.federalRateOverride != null ? String((input.federalRateOverride * 100).toFixed(2)) : ''
+  )
+
+  const tiOverridden   = input.taxableIncomeOverride != null
+  const rateOverridden = input.federalRateOverride != null
+
+  function handleTIChange(raw: string) {
+    setTiRaw(raw)
+    const num = parseFloat(raw.replace(/,/g, ''))
+    if (!isNaN(num) && num >= 0) onTaxableIncomeOverride?.(num)
+    else if (raw === '' || raw === '-') onTaxableIncomeOverride?.(null)
+  }
+
+  function handleRateChange(raw: string) {
+    setRateRaw(raw)
+    const pct = parseFloat(raw.replace(/%/g, ''))
+    if (!isNaN(pct) && pct >= 0 && pct <= 100) onFederalRateOverride?.(pct / 100)
+    else if (raw === '' || raw === '-') onFederalRateOverride?.(null)
+  }
+
+  function resetTI() {
+    setTiRaw('')
+    onTaxableIncomeOverride?.(null)
+  }
+
+  function resetRate() {
+    setRateRaw('')
+    onFederalRateOverride?.(null)
+  }
+
+  // Keep display in sync when input prop changes externally (e.g. navigating to saved plan)
+  const syncedTI = input.taxableIncomeOverride != null ? String(input.taxableIncomeOverride) : ''
+  const syncedRate = input.federalRateOverride != null ? String((input.federalRateOverride * 100).toFixed(2)) : ''
+  if (tiRaw !== syncedTI && !document.activeElement?.matches('input')) setTiRaw(syncedTI)
+  if (rateRaw !== syncedRate && !document.activeElement?.matches('input')) setRateRaw(syncedRate)
+
+  const calcTI   = output.taxableIncome
+  const calcRate = (federal.effectiveFederalRate * 100).toFixed(2)
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -24,6 +125,60 @@ export function FederalBreakdown({ input, output }: Props) {
           Federal Tax Breakdown
         </h3>
       </div>
+
+      {/* Input adjustments — taxable income and rate */}
+      {canAdjust && (
+        <div className="px-6 pb-3">
+          <div className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3 space-y-2">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Input Adjustments</p>
+
+            {/* Taxable Income */}
+            {onTaxableIncomeOverride && (
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <span className="text-sm text-slate-700 font-medium">Taxable Income</span>
+                  {!tiOverridden && (
+                    <span className="ml-2 text-xs text-slate-400">calc: {formatCurrency(calcTI)}</span>
+                  )}
+                  {tiOverridden && (
+                    <span className="ml-2 text-xs text-amber-600">override active</span>
+                  )}
+                </div>
+                <OverrideInput
+                  placeholder={String(Math.round(calcTI))}
+                  value={tiRaw}
+                  onChange={handleTIChange}
+                  onReset={resetTI}
+                  isOverridden={tiOverridden}
+                />
+              </div>
+            )}
+
+            {/* Federal Rate */}
+            {onFederalRateOverride && (
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <span className="text-sm text-slate-700 font-medium">Federal Rate</span>
+                  {!rateOverridden && (
+                    <span className="ml-2 text-xs text-slate-400">bracket: {calcRate}%</span>
+                  )}
+                  {rateOverridden && (
+                    <span className="ml-2 text-xs text-amber-600">override active</span>
+                  )}
+                </div>
+                <OverrideInput
+                  placeholder={calcRate}
+                  value={rateRaw}
+                  onChange={handleRateChange}
+                  onReset={resetRate}
+                  suffix="%"
+                  isOverridden={rateOverridden}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Income Tax */}
       <div className="px-6 pb-1">

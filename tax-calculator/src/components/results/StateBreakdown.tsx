@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { TaxInput, TaxOutput } from '@/types'
 import { formatCurrency, formatPercent } from '@/lib/utils'
 
@@ -12,8 +13,56 @@ interface Props {
   output: TaxOutput
   /** TN S-Corp: called when the adjusted-salary toggle is flipped */
   onFEToggle?: (feUsesAdjustedSalary: boolean) => void
+  /** TN: called when the F&E apportionment % changes */
+  onApportionmentChange?: (pct: number) => void
   /** Raw form-state payroll values — used to show toggle before confirmation */
   payrollAdjState?: PayrollAdjState
+}
+
+function ApportionmentInput({ pct, onChange }: { pct: number; onChange: (v: number) => void }) {
+  const [raw, setRaw] = useState(String(pct))
+  const isOverridden = pct !== 100
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const v = e.target.value
+    setRaw(v)
+    const num = parseFloat(v)
+    if (!isNaN(num) && num >= 0 && num <= 100) onChange(num)
+  }
+
+  function reset() {
+    setRaw('100')
+    onChange(100)
+  }
+
+  return (
+    <div className={`mb-3 flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 ${isOverridden ? 'bg-amber-50 border border-amber-200' : 'bg-slate-50 border border-slate-200'}`}>
+      <div className="text-xs text-slate-600 leading-relaxed">
+        <span className="font-medium text-slate-700">TN Apportionment</span>
+        <span className="block text-slate-400 mt-0.5">
+          Percentage of business income subject to TN F&E tax.
+        </span>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="relative">
+          <input
+            type="text"
+            value={raw}
+            onChange={handleChange}
+            className={`w-20 text-right text-sm tabular-nums border rounded-lg px-2 py-1 pr-6 focus:outline-none focus:ring-2 focus:ring-orange-400 ${
+              isOverridden ? 'border-amber-400 bg-white text-amber-900' : 'border-slate-300 bg-white text-slate-700'
+            }`}
+          />
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">%</span>
+        </div>
+        {isOverridden && (
+          <button type="button" onClick={reset} className="text-xs text-amber-600 hover:text-amber-800 font-medium whitespace-nowrap">
+            ↩ reset
+          </button>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function Row({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
@@ -25,7 +74,7 @@ function Row({ label, value, muted }: { label: string; value: string; muted?: bo
   )
 }
 
-export function StateBreakdown({ input, output, onFEToggle }: Props) {
+export function StateBreakdown({ input, output, onFEToggle, onApportionmentChange }: Props) {
   const { state } = output
   const hasStateTax = state.stateIncomeTax > 0
   const hasEntityTax = state.exciseTax > 0 || state.franchiseTax > 0
@@ -64,6 +113,14 @@ export function StateBreakdown({ input, output, onFEToggle }: Props) {
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
               {input.companyType} Franchise & Excise
             </p>
+
+            {/* TN: apportionment percentage */}
+            {input.state === 'TN' && onApportionmentChange && (
+              <ApportionmentInput
+                pct={input.tnApportionmentPct ?? 100}
+                onChange={onApportionmentChange}
+              />
+            )}
 
             {/* TN S-Corp: toggle to deduct shareholder salary from excise tax base */}
             {input.state === 'TN' && input.companyType === 'S-Corp' && (

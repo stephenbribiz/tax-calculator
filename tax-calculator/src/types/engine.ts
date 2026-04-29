@@ -44,6 +44,11 @@ export interface TaxInput {
   annualizeIncome: boolean
   feUsesAdjustedSalary: boolean  // TN S-Corp: use feAdjustedSalary as excise tax wage deduction
   feAdjustedSalary: number       // TN S-Corp: raw adjusted salary for F&E (always set, independent of FICA confirmation)
+  tnApportionmentPct: number     // % of business net income subject to TN F&E (0–100, default 100)
+
+  // Input overrides — user-set values that replace calculated inputs before the engine runs
+  taxableIncomeOverride: number | null  // replaces calculated taxable income entering the federal brackets
+  federalRateOverride: number | null    // flat federal rate (0–1) applied instead of bracket lookup
 
   // Present when client has multiple businesses — stored in snapshot for display only.
   // The engine always receives the summed totals in the fields above.

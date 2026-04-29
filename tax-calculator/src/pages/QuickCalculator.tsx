@@ -69,7 +69,10 @@ export default function QuickCalculator() {
       numDependentChildren: profile.numDependentChildren,
       state:                profile.state,
       ...financials,
-      feAdjustedSalary:     0,
+      feAdjustedSalary:        0,
+      tnApportionmentPct:      100,
+      taxableIncomeOverride:   null,
+      federalRateOverride:     null,
     }
   }, [profile, financials])
 
@@ -107,7 +110,10 @@ export default function QuickCalculator() {
       numDependentChildren: profile.numDependentChildren,
       state:                profile.state,
       ...data,
-      feAdjustedSalary:     0,
+      feAdjustedSalary:        0,
+      tnApportionmentPct:      100,
+      taxableIncomeOverride:   null,
+      federalRateOverride:     null,
     }
     setOutput(calculateTax(input))
     setStep('results')

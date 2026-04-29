@@ -48,6 +48,9 @@ function toTaxInput(s1: Step1Data, s2: Step2Data, s3: Step3Data): TaxInput {
     annualizeIncome:         s3.annualizeIncome,
     feUsesAdjustedSalary:    s3.feUsesAdjustedSalary ?? true,
     feAdjustedSalary:        s3.adjustedSalary,   // raw, not gated by FICA confirmation
+    tnApportionmentPct:      s3.tnApportionmentPct ?? 100,
+    taxableIncomeOverride:   s3.taxableIncomeOverride ?? null,
+    federalRateOverride:     s3.federalRateOverride ?? null,
     businessBreakdown:       s3.businessBreakdown,
   }
 }
@@ -86,6 +89,9 @@ function fromTaxInput(input: TaxInput): { step1: Step1Data; step2: Step2Data; st
       deductionOverride:   input.deductionOverride,
       annualizeIncome:         input.annualizeIncome,
       feUsesAdjustedSalary:    input.feUsesAdjustedSalary ?? true,  // old plans default to ON (deduct)
+      tnApportionmentPct:      input.tnApportionmentPct ?? 100,
+      taxableIncomeOverride:   input.taxableIncomeOverride ?? null,
+      federalRateOverride:     input.federalRateOverride ?? null,
       businessBreakdown:       input.businessBreakdown,
     },
   }
@@ -292,8 +298,19 @@ export default function NewReport() {
 
   // Called by StateBreakdown when the TN F&E adjusted-salary toggle is flipped
   const handleFEToggle = useCallback((feUsesAdjustedSalary: boolean) => {
-    console.log('[FEToggle] feUsesAdjustedSalary=', feUsesAdjustedSalary, 'salary=', state.step3.shareholderSalary, 'netIncome=', state.step3.businessNetIncome)
     dispatch({ type: 'SET_STEP3', payload: { ...state.step3, feUsesAdjustedSalary } })
+  }, [dispatch, state.step3])
+
+  const handleApportionmentChange = useCallback((tnApportionmentPct: number) => {
+    dispatch({ type: 'SET_STEP3', payload: { ...state.step3, tnApportionmentPct } })
+  }, [dispatch, state.step3])
+
+  const handleTaxableIncomeOverride = useCallback((val: number | null) => {
+    dispatch({ type: 'SET_STEP3', payload: { ...state.step3, taxableIncomeOverride: val } })
+  }, [dispatch, state.step3])
+
+  const handleFederalRateOverride = useCallback((val: number | null) => {
+    dispatch({ type: 'SET_STEP3', payload: { ...state.step3, federalRateOverride: val } })
   }, [dispatch, state.step3])
 
   async function handleSave() {
@@ -560,6 +577,9 @@ export default function NewReport() {
                 shareholderSalary:   state.step3.shareholderSalary,
               }}
               onFEToggle={handleFEToggle}
+              onApportionmentChange={handleApportionmentChange}
+              onTaxableIncomeOverride={handleTaxableIncomeOverride}
+              onFederalRateOverride={handleFederalRateOverride}
             />
           </div>
         </div>

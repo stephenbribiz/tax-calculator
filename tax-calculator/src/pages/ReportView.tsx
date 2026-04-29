@@ -52,18 +52,18 @@ export default function ReportView() {
     load()
   }, [id])
 
-  // Allow the TN F&E salary toggle to recalculate live even on the read-only view
-  const handleFEToggle = useCallback((feUsesAdjustedSalary: boolean) => {
+  // Generic helper: update one or more input fields and recalculate
+  const recalcWith = useCallback((updates: Partial<typeof input>) => {
     if (!input) return
-    const updatedInput = { ...input, feUsesAdjustedSalary }
-    console.log('[FEToggle] feUsesAdjustedSalary=', feUsesAdjustedSalary, 'shareholderSalary=', input.shareholderSalary, 'businessNetIncome=', input.businessNetIncome)
+    const updatedInput = { ...input, ...updates }
     setInput(updatedInput)
-    try {
-      const newOutput = calculateTax(updatedInput)
-      console.log('[FEToggle] exciseTax=', newOutput.state.exciseTax, 'totalStateOwed=', newOutput.totalStateOwed)
-      setOutput(newOutput)
-    } catch (e) { console.error('[FEToggle] error', e) }
+    try { setOutput(calculateTax(updatedInput)) } catch (e) { console.error('[recalcWith]', e) }
   }, [input])
+
+  const handleFEToggle            = useCallback((v: boolean)         => recalcWith({ feUsesAdjustedSalary: v }),   [recalcWith])
+  const handleApportionmentChange = useCallback((v: number)          => recalcWith({ tnApportionmentPct: v }),    [recalcWith])
+  const handleTaxableIncomeOverride = useCallback((v: number | null) => recalcWith({ taxableIncomeOverride: v }), [recalcWith])
+  const handleFederalRateOverride   = useCallback((v: number | null) => recalcWith({ federalRateOverride: v }),   [recalcWith])
 
   async function finalizePlan() {
     if (!id) return
@@ -163,7 +163,14 @@ export default function ReportView() {
         </div>
       </div>
 
-      <ResultsPanel input={input} output={output} onFEToggle={handleFEToggle} />
+      <ResultsPanel
+        input={input}
+        output={output}
+        onFEToggle={handleFEToggle}
+        onApportionmentChange={handleApportionmentChange}
+        onTaxableIncomeOverride={handleTaxableIncomeOverride}
+        onFederalRateOverride={handleFederalRateOverride}
+      />
 
       <ConfirmModal
         open={confirmFinalize}

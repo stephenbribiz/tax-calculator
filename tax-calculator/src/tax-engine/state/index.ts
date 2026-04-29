@@ -19,13 +19,15 @@ export interface StateCalcInput {
   shareholderSalary?: number
   /** TN S-Corp: when true, the salary passed here is already the adjusted value */
   feUsesAdjustedSalary?: boolean
+  /** TN: percentage of business net income subject to F&E tax (0–100, default 100) */
+  tnApportionmentPct?: number
 }
 
 export function calculateStateTax(input: StateCalcInput): StateResult {
   const { state, allocatedBusinessIncome, taxableIncome, filingStatus, year, companyType, businessNetIncome } = input
 
   switch (state) {
-    case 'TN': return calculateTN(allocatedBusinessIncome, taxableIncome, filingStatus, year, companyType, businessNetIncome, input.shareholderSalary, input.feUsesAdjustedSalary)
+    case 'TN': return calculateTN(allocatedBusinessIncome, taxableIncome, filingStatus, year, companyType, businessNetIncome, input.shareholderSalary, input.feUsesAdjustedSalary, input.tnApportionmentPct)
     case 'CA': return calculateCA(allocatedBusinessIncome, taxableIncome, filingStatus, year)
     case 'GA': return calculateGA(allocatedBusinessIncome, taxableIncome, filingStatus, year)
     case 'NC': return calculateNC(allocatedBusinessIncome, taxableIncome, filingStatus, year)

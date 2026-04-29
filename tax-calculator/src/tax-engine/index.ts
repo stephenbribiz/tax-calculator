@@ -48,6 +48,9 @@ export function calculateTax(input: TaxInput): TaxOutput {
   // (feAdjustedSalary / adjustedSalary). Fall back to actual paid salary for older plans.
   const feSalary = input.feAdjustedSalary || input.adjustedSalary || input.shareholderSalary
 
+  // User-supplied input overrides (null = use calculated value)
+  const hasTaxableIncomeOverride = input.taxableIncomeOverride != null
+
   const seNetIncome = Math.max(0, actualAllocatedIncome + mealAddBack)
   const seTaxResult = calculateSETax(seNetIncome, input.taxYear, input.companyType)
 
@@ -132,10 +135,15 @@ export function calculateTax(input: TaxInput): TaxOutput {
     const annTaxableWithQBI = Math.max(0, annTaxable - annQBI)
     const annBusinessTaxableWithQBI = Math.max(0, annBusinessTaxable - annQBI)
 
+    const annEffectiveTaxable = hasTaxableIncomeOverride ? input.taxableIncomeOverride! : annTaxableWithQBI
+    const annEffectiveBusinessTaxable = hasTaxableIncomeOverride
+      ? (annTaxableWithQBI > 0 ? annEffectiveTaxable * (annBusinessTaxableWithQBI / annTaxableWithQBI) : annEffectiveTaxable)
+      : annBusinessTaxableWithQBI
+
     const annFederal = calculateFederal({
-      taxableIncome: annTaxableWithQBI,
+      taxableIncome: annEffectiveTaxable,
       totalAGI: annAGI,
-      businessTaxableIncome: annBusinessTaxableWithQBI,
+      businessTaxableIncome: annEffectiveBusinessTaxable,
       filingStatus: input.filingStatus,
       companyType: input.companyType,
       shareholderSalary: input.shareholderSalary,
@@ -145,6 +153,7 @@ export function calculateTax(input: TaxInput): TaxOutput {
       seAdditionalMedicare: annSETax.additionalMedicare,
       numDependentChildren: input.numDependentChildren,
       taxData,
+      federalRateOverride: input.federalRateOverride,
     })
 
     // Prorate the full-year federal result to get the quarterly share
@@ -161,8 +170,8 @@ export function calculateTax(input: TaxInput): TaxOutput {
 
     // Federal: prorate income tax portion, use actual SE tax
     const proratedIncomeTax = annFederal.netIncomeTax * proration
-    const businessRatio = annTaxableWithQBI > 0
-      ? Math.min(1, annBusinessTaxableWithQBI / annTaxableWithQBI)
+    const businessRatio = annEffectiveTaxable > 0
+      ? Math.min(1, annEffectiveBusinessTaxable / annEffectiveTaxable)
       : 1
     const proratedBusinessIncomeTax = proratedIncomeTax * businessRatio
 
@@ -190,6 +199,7 @@ export function calculateTax(input: TaxInput): TaxOutput {
       businessNetIncome: input.businessNetIncome,
       shareholderSalary: feSalary,
       feUsesAdjustedSalary: input.feUsesAdjustedSalary,
+      tnApportionmentPct: input.tnApportionmentPct,
     })
     totalStateOwed = annState.stateIncomeTax * proration
 
@@ -204,6 +214,7 @@ export function calculateTax(input: TaxInput): TaxOutput {
       businessNetIncome: input.businessNetIncome,
       shareholderSalary: feSalary,
       feUsesAdjustedSalary: input.feUsesAdjustedSalary,
+      tnApportionmentPct: input.tnApportionmentPct,
     })
 
     // Add entity-level taxes (excise + franchise) — full annual amount minus prior F&E payments
@@ -242,11 +253,17 @@ export function calculateTax(input: TaxInput): TaxOutput {
   }
 
   // ── NON-ANNUALIZED PATH ──
+  // Apply taxable income override if set (replaces bracket input, business ratio preserved)
+  const effectiveTaxableIncome = hasTaxableIncomeOverride ? input.taxableIncomeOverride! : taxableIncomeWithQBI
+  const effectiveBusinessTaxable = hasTaxableIncomeOverride
+    ? (taxableIncomeWithQBI > 0 ? effectiveTaxableIncome * (businessTaxableWithQBI / taxableIncomeWithQBI) : effectiveTaxableIncome)
+    : businessTaxableWithQBI
+
   // Use actual income with prorated deduction/credit. No final proration.
   federal = calculateFederal({
-    taxableIncome: taxableIncomeWithQBI,
+    taxableIncome: effectiveTaxableIncome,
     totalAGI,
-    businessTaxableIncome: businessTaxableWithQBI,
+    businessTaxableIncome: effectiveBusinessTaxable,
     filingStatus: input.filingStatus,
     companyType: input.companyType,
     shareholderSalary: input.shareholderSalary,
@@ -256,6 +273,7 @@ export function calculateTax(input: TaxInput): TaxOutput {
     seAdditionalMedicare: seTaxResult.additionalMedicare,
     numDependentChildren: input.numDependentChildren,
     taxData,
+    federalRateOverride: input.federalRateOverride,
   })
 
   // Prorate the child tax credit
@@ -266,8 +284,8 @@ export function calculateTax(input: TaxInput): TaxOutput {
   }
 
   // Recalculate totals with prorated credit
-  const businessRatio = taxableIncomeWithQBI > 0
-    ? Math.min(1, businessTaxableWithQBI / taxableIncomeWithQBI)
+  const businessRatio = effectiveTaxableIncome > 0
+    ? Math.min(1, effectiveBusinessTaxable / effectiveTaxableIncome)
     : 1
   const businessIncomeTax = federal.netIncomeTax * businessRatio
   const federalTotal = businessIncomeTax + seTaxResult.seTax + additionalFICA
@@ -291,6 +309,7 @@ export function calculateTax(input: TaxInput): TaxOutput {
     businessNetIncome: input.businessNetIncome,
     shareholderSalary: feSalary,
     feUsesAdjustedSalary: input.feUsesAdjustedSalary,
+    tnApportionmentPct: input.tnApportionmentPct,
   })
   totalStateOwed = state.stateIncomeTax // no proration
 

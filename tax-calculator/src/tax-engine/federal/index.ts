@@ -16,6 +16,8 @@ interface FederalCalcInput {
   seAdditionalMedicare: number
   numDependentChildren: number
   taxData: FederalTaxData
+  /** Optional: flat rate (0–1) applied instead of bracket lookup */
+  federalRateOverride?: number | null
 }
 
 export function calculateFederal(input: FederalCalcInput): FederalResult {
@@ -32,7 +34,19 @@ export function calculateFederal(input: FederalCalcInput): FederalResult {
   } = input
 
   const brackets = taxData.brackets[filingStatus]
-  const { tax: grossIncomeTax, marginalRate, effectiveRate } = applyProgressiveBrackets(taxableIncome, brackets)
+
+  let grossIncomeTax: number, marginalRate: number, effectiveRate: number
+  if (input.federalRateOverride != null) {
+    // User-supplied flat rate overrides the bracket lookup
+    grossIncomeTax = taxableIncome * input.federalRateOverride
+    marginalRate   = input.federalRateOverride
+    effectiveRate  = input.federalRateOverride
+  } else {
+    const result = applyProgressiveBrackets(taxableIncome, brackets)
+    grossIncomeTax = result.tax
+    marginalRate   = result.marginalRate
+    effectiveRate  = result.effectiveRate
+  }
 
   // Child tax credit applied against total tax
   const childTaxCredit = calculateChildTaxCredit(numDependentChildren, totalAGI, filingStatus, taxData)
@@ -56,8 +70,8 @@ export function calculateFederal(input: FederalCalcInput): FederalResult {
     childTaxCredit,
     netIncomeTax,
     seTax,
-    seSocialSecurity: input.seSocialSecurity,
-    seMedicare: input.seMedicare,
+    seSocialSecurity:    input.seSocialSecurity,
+    seMedicare:          input.seMedicare,
     seAdditionalMedicare: input.seAdditionalMedicare,
     ficaAlreadyPaid,
     totalFederalBeforeProration,

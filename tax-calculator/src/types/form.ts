@@ -31,6 +31,9 @@ export interface Step3Data {
   deductionOverride: number | null
   annualizeIncome: boolean
   feUsesAdjustedSalary: boolean  // TN S-Corp: use adjusted salary as excise tax wage deduction
+  tnApportionmentPct: number     // TN F&E apportionment (0–100, default 100)
+  taxableIncomeOverride: number | null
+  federalRateOverride: number | null
   businessBreakdown?: BusinessRow[]
 }
 
