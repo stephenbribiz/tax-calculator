@@ -1,8 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
-import type { TaxInput, TaxOutput, Step1Data, Step2Data, Step3Data, Quarter, CompanyType, FilingStatus, StateCode, OutputOverrides } from '@/types'
+import type { TaxInput, TaxOutput, Step1Data, Step2Data, Step3Data, Quarter, CompanyType, FilingStatus, StateCode } from '@/types'
 import { calculateTax } from '@/tax-engine'
-import { applyOverrides } from '@/lib/applyOverrides'
 import { useFormState } from '@/hooks/useFormState'
 import { useUnsavedChangesWarning } from '@/hooks/useUnsavedChangesWarning'
 import { useAuth } from '@/hooks/useAuth'
@@ -16,8 +15,6 @@ import { ResultsPanel } from '@/components/results/ResultsPanel'
 import { Button } from '@/components/ui/Button'
 import { ExcelDownloadButton } from '@/components/ExcelDownloadButton'
 import { useToast } from '@/components/ui/Toast'
-import { CurrencyInput } from '@/components/ui/CurrencyInput'
-import { formatCurrency } from '@/lib/utils'
 
 const PDFDownloadButton = lazy(() =>
   import('@/components/pdf/PDFDownloadButton').then(m => ({ default: m.PDFDownloadButton }))
@@ -52,7 +49,6 @@ function toTaxInput(s1: Step1Data, s2: Step2Data, s3: Step3Data): TaxInput {
     feUsesAdjustedSalary:    s3.feUsesAdjustedSalary ?? true,
     feAdjustedSalary:        s3.adjustedSalary,   // raw, not gated by FICA confirmation
     businessBreakdown:       s3.businessBreakdown,
-    outputOverrides:         s3.outputOverrides,
   }
 }
 
@@ -91,129 +87,12 @@ function fromTaxInput(input: TaxInput): { step1: Step1Data; step2: Step2Data; st
       annualizeIncome:         input.annualizeIncome,
       feUsesAdjustedSalary:    input.feUsesAdjustedSalary ?? true,  // old plans default to ON (deduct)
       businessBreakdown:       input.businessBreakdown,
-      outputOverrides:         input.outputOverrides,
     },
   }
 }
 
 const QUARTERS: Quarter[] = ['Q1', 'Q2', 'Q3', 'Q4']
 
-/** Inline panel letting the user override key calculated output values before saving */
-function ManualAdjustmentsPanel({
-  calculated,
-  overrides,
-  onChange,
-}: {
-  calculated: TaxOutput
-  overrides: OutputOverrides
-  onChange: (next: OutputOverrides) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const activeCount = Object.values(overrides).filter(v => v !== undefined).length
-
-  function set(key: keyof OutputOverrides, value: number | undefined) {
-    onChange({ ...overrides, [key]: value })
-  }
-
-  function reset(key: keyof OutputOverrides) {
-    const next = { ...overrides }
-    delete next[key]
-    onChange(next)
-  }
-
-  function resetAll() { onChange({}) }
-
-  // Helper: render one override row
-  function Row({
-    label,
-    field,
-    calcValue,
-  }: {
-    label: string
-    field: keyof OutputOverrides
-    calcValue: number
-  }) {
-    const isOverridden = overrides[field] !== undefined
-    const displayValue = overrides[field] ?? calcValue
-    return (
-      <div className="flex items-center gap-3">
-        <span className="text-xs text-slate-600 w-36 shrink-0">{label}</span>
-        <div className="flex-1 relative">
-          <CurrencyInput
-            value={displayValue}
-            onChange={v => set(field, v === calcValue ? undefined : v)}
-            className={isOverridden ? 'border-amber-400 bg-amber-50 focus:ring-amber-500' : ''}
-          />
-        </div>
-        <span className="text-xs text-slate-400 w-24 shrink-0 tabular-nums">
-          calc: {formatCurrency(calcValue)}
-        </span>
-        {isOverridden ? (
-          <button
-            type="button"
-            onClick={() => reset(field)}
-            title="Reset to calculated value"
-            className="text-xs text-amber-600 hover:text-amber-800 font-medium shrink-0"
-          >
-            ↩ reset
-          </button>
-        ) : (
-          <span className="w-14 shrink-0" />
-        )}
-      </div>
-    )
-  }
-
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-5 py-3 hover:bg-slate-50 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-          </svg>
-          <span className="text-sm font-medium text-slate-700">Manual Adjustments</span>
-          {activeCount > 0 && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-              {activeCount} override{activeCount !== 1 ? 's' : ''}
-            </span>
-          )}
-        </div>
-        <svg
-          className={`w-4 h-4 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
-          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="px-5 pb-4 border-t border-slate-100 pt-4 space-y-3">
-          <p className="text-xs text-slate-400 mb-3">
-            Override any calculated value — changes appear in the results panel live and are saved with the plan.
-            Overridden fields are highlighted in amber.
-          </p>
-          <Row label="QBI Deduction" field="qbiDeduction" calcValue={calculated.qbiDeduction} />
-          <Row label="Total Federal Owed" field="totalFederalOwed" calcValue={calculated.totalFederalOwed} />
-          <Row label="Total State Owed" field="totalStateOwed" calcValue={calculated.totalStateOwed} />
-          <Row label="Net Amount Due" field="netAmountDue" calcValue={Math.max(0, calculated.totalTaxOwed - calculated.priorEstimatesPaid)} />
-          {activeCount > 0 && (
-            <button
-              type="button"
-              onClick={resetAll}
-              className="text-xs text-slate-500 hover:text-red-600 mt-1 underline"
-            >
-              Reset all overrides
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
 
 export default function NewReport() {
   const { state, dispatch, hasDraft, draft } = useFormState()
@@ -224,7 +103,6 @@ export default function NewReport() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [output, setOutput] = useState<TaxOutput | null>(null)
-  const [outputOverrides, setOutputOverrides] = useState<OutputOverrides>({})
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const clientLoaded = useRef(false)
   const reportLoaded = useRef(false)
@@ -269,7 +147,6 @@ export default function NewReport() {
       const { step1, step2, step3 } = fromTaxInput(input)
 
       setEditClientId(data.client_id)
-      if (input.outputOverrides) setOutputOverrides(input.outputOverrides)
 
       dispatch({ type: 'SET_STEP1', payload: step1 })
       dispatch({ type: 'SET_STEP2', payload: step2 })
@@ -389,17 +266,6 @@ export default function NewReport() {
   }, [taxInput, state.step])
 
   // Effective output = calculated + manual overrides applied on top
-  const effectiveOutput = useMemo(
-    () => output ? applyOverrides(output, outputOverrides) : null,
-    [output, outputOverrides]
-  )
-
-  // Keep step3.outputOverrides in sync so saves include them
-  const handleOverrideChange = useCallback((overrides: OutputOverrides) => {
-    setOutputOverrides(overrides)
-    dispatch({ type: 'SET_STEP3', payload: { ...state.step3, outputOverrides: overrides } })
-  }, [dispatch, state.step3])
-
   const handleStep1 = useCallback((data: Step1Data) => {
     dispatch({ type: 'SET_STEP1', payload: data })
     dispatch({ type: 'GO_TO_STEP', payload: 2 })
@@ -411,9 +277,6 @@ export default function NewReport() {
   }, [dispatch])
 
   const handleStep3 = useCallback((data: Step3Data) => {
-    // Clear overrides when re-entering from a fresh Step 3 submit
-    // (overrides are restored on edit-load, but cleared when the user recalculates)
-    setOutputOverrides({})
     dispatch({ type: 'SET_STEP3', payload: data })
     const input = toTaxInput(state.step1, state.step2, data)
     setOutput(calculateTax(input))
@@ -434,8 +297,7 @@ export default function NewReport() {
   }, [dispatch, state.step3])
 
   async function handleSave() {
-    if (!effectiveOutput || !user) return
-    const output = effectiveOutput  // save the effective (possibly overridden) output
+    if (!output || !user) return
     setSaving(true)
     setSaveError(null)
 
@@ -642,7 +504,7 @@ export default function NewReport() {
         </div>
       )}
 
-      {state.step === 'results' && effectiveOutput && (
+      {state.step === 'results' && output && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left: form summary + actions */}
           <div className="space-y-4">
@@ -664,13 +526,6 @@ export default function NewReport() {
               </dl>
             </div>
 
-            {/* Manual adjustments — override any calculated value */}
-            <ManualAdjustmentsPanel
-              calculated={output!}
-              overrides={outputOverrides}
-              onChange={handleOverrideChange}
-            />
-
             <div className="flex flex-wrap gap-3">
               <Button
                 variant="secondary"
@@ -678,9 +533,9 @@ export default function NewReport() {
               >
                 ← Edit Financials
               </Button>
-              <ExcelDownloadButton input={taxInput} output={effectiveOutput} />
+              <ExcelDownloadButton input={taxInput} output={output} />
               <Suspense fallback={<Button variant="secondary" disabled>↓ PDF</Button>}>
-                <PDFDownloadButton input={taxInput} output={effectiveOutput} />
+                <PDFDownloadButton input={taxInput} output={output} />
               </Suspense>
               <Button onClick={handleSave} loading={saving}>
                 {isEditing ? 'Update Tax Plan' : 'Save Tax Plan'}
@@ -694,11 +549,10 @@ export default function NewReport() {
             )}
           </div>
 
-          {/* Right: results (uses effectiveOutput so overrides are reflected live) */}
           <div>
             <ResultsPanel
               input={taxInput}
-              output={effectiveOutput}
+              output={output}
               onPayrollAdj={handlePayrollAdj}
               payrollAdjState={{
                 adjustedSalary:      state.step3.adjustedSalary,

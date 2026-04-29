@@ -1,4 +1,4 @@
-import type { BusinessRow, CompanyType, FilingStatus, OutputOverrides, Quarter, StateCode } from './engine'
+import type { BusinessRow, CompanyType, FilingStatus, Quarter, StateCode } from './engine'
 
 export interface Step1Data {
   companyName: string
@@ -32,7 +32,6 @@ export interface Step3Data {
   annualizeIncome: boolean
   feUsesAdjustedSalary: boolean  // TN S-Corp: use adjusted salary as excise tax wage deduction
   businessBreakdown?: BusinessRow[]
-  outputOverrides?: OutputOverrides
 }
 
 export interface FormState {
