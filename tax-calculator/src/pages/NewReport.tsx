@@ -429,6 +429,7 @@ export default function NewReport() {
 
   // Called by StateBreakdown when the TN F&E adjusted-salary toggle is flipped
   const handleFEToggle = useCallback((feUsesAdjustedSalary: boolean) => {
+    console.log('[FEToggle] feUsesAdjustedSalary=', feUsesAdjustedSalary, 'salary=', state.step3.shareholderSalary, 'netIncome=', state.step3.businessNetIncome)
     dispatch({ type: 'SET_STEP3', payload: { ...state.step3, feUsesAdjustedSalary } })
   }, [dispatch, state.step3])
 

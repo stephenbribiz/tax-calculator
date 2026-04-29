@@ -43,6 +43,7 @@ export function calculateTN(
   const exciseTax = entitySubjectToExcise && exciseBase > 0
     ? exciseBase * 0.065
     : 0
+  console.log('[TN] fullBusinessIncome=', fullBusinessIncome, 'salary=', salary, 'deductSalary=', deductSalary, 'exciseBase=', exciseBase, 'exciseTax=', exciseTax)
 
   // Franchise tax: 0.25% of net worth (minimum $100/year)
   // We don't have net worth data, so use the minimum as an estimate
